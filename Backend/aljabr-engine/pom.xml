@@ -71,6 +71,23 @@
             <artifactId>quarkus-redis-client</artifactId>
         </dependency>
 
+        <!-- Lucene dependencies for Search Engine -->
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-core</artifactId>
+            <version>9.11.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-queryparser</artifactId>
+            <version>9.11.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-analysis-common</artifactId>
+            <version>9.11.1</version>
+        </dependency>
+
         <!-- Tooling and Serialization -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
