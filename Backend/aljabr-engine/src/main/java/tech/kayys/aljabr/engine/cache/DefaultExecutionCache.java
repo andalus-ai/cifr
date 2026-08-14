@@ -1,10 +1,16 @@
 package tech.kayys.aljabr.engine.cache;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.redis.datasource.ReactiveRedisDataSource;
+import io.quarkus.redis.datasource.keys.ReactiveKeyCommands;
+import io.quarkus.redis.datasource.value.ReactiveValueCommands;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 @ApplicationScoped
@@ -12,23 +18,39 @@ public class DefaultExecutionCache implements ExecutionCache {
     
     private static final Logger log = Logger.getLogger(DefaultExecutionCache.class.getName());
     
-    // In-memory cache for MVP: stores CacheEntry mapped by the fully qualified string of CacheKey
-    private final Map<String, CacheEntry> store = new ConcurrentHashMap<>();
+    private final ReactiveValueCommands<String, String> valueCommands;
+    private final ReactiveKeyCommands<String> keyCommands;
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    private record CacheEntry(Object value, Instant expiresAt) {}
+    @Inject
+    public DefaultExecutionCache(ReactiveRedisDataSource ds) {
+        this.valueCommands = ds.value(String.class);
+        this.keyCommands = ds.key();
+    }
+
+    private record CacheEntry(String valueJson, Instant expiresAt) {}
 
     @Override
     public void invalidate(String sourceHash) {
-        // Find and remove entries matching a source hash (namespace or inputHash component)
-        store.keySet().removeIf(keyStr -> keyStr.contains(sourceHash));
-        log.info("Invalidated cache entries related to " + sourceHash);
+        // Find keys via KEYS pattern (not recommended for prod but okay for MVP caching logic)
+        keyCommands.keys("*" + sourceHash + "*").subscribe().with(keys -> {
+            if (keys != null && !keys.isEmpty()) {
+                keyCommands.del(keys.toArray(new String[0])).subscribe().with(
+                    count -> log.info("Invalidated " + count + " cache entries related to " + sourceHash)
+                );
+            }
+        });
     }
 
     @Override
     public void invalidateByQuery(String query) {
-        // Example: clear everything for a specific session or namespace
-        store.keySet().removeIf(keyStr -> keyStr.contains(query));
-        log.info("Invalidated cache entries matching query: " + query);
+        keyCommands.keys("*" + query + "*").subscribe().with(keys -> {
+            if (keys != null && !keys.isEmpty()) {
+                keyCommands.del(keys.toArray(new String[0])).subscribe().with(
+                    count -> log.info("Invalidated " + count + " cache entries matching query: " + query)
+                );
+            }
+        });
     }
 
     @Override
@@ -38,22 +60,31 @@ public class DefaultExecutionCache implements ExecutionCache {
         }
         
         String keyStr = key.toString();
-        CacheEntry entry = store.get(keyStr);
-        if (entry == null) {
+        // Since we are synchronous on the interface but Redis is reactive, 
+        // we might block for the cache retrieval, or since it's Optional<Object>, we block.
+        // For MVP, blocking is acceptable if the interface requires it.
+        try {
+            String json = valueCommands.get(keyStr).await().indefinitely();
+            if (json == null) {
+                return Optional.empty();
+            }
+            CacheEntry entry = mapper.readValue(json, CacheEntry.class);
+            
+            if (entry.expiresAt() != null && Instant.now().isAfter(entry.expiresAt())) {
+                keyCommands.del(keyStr).subscribe().with(c -> {});
+                return Optional.empty();
+            }
+            
+            Object parsedValue = mapper.readValue(entry.valueJson(), Object.class);
+            if (!policy.allowNegativeCaching() && isNegativeMarker(parsedValue)) {
+                return Optional.empty();
+            }
+            return Optional.ofNullable(parsedValue);
+            
+        } catch (Exception e) {
+            log.warning("Cache retrieval failed for key: " + keyStr + " " + e.getMessage());
             return Optional.empty();
         }
-        
-        if (entry.expiresAt() != null && Instant.now().isAfter(entry.expiresAt())) {
-            store.remove(keyStr);
-            return Optional.empty();
-        }
-        
-        // Handle negative caching (if value is a designated negative marker and policy disallows it, ignore it)
-        if (!policy.allowNegativeCaching() && isNegativeMarker(entry.value())) {
-            return Optional.empty();
-        }
-        
-        return Optional.of(entry.value());
     }
 
     @Override
@@ -62,12 +93,22 @@ public class DefaultExecutionCache implements ExecutionCache {
         if (policy.ttl() != null) {
             expiresAt = Instant.now().plus(policy.ttl());
         }
-        
-        store.put(key.toString(), new CacheEntry(value, expiresAt));
+        try {
+            String valueJson = mapper.writeValueAsString(value);
+            CacheEntry entry = new CacheEntry(valueJson, expiresAt);
+            String entryJson = mapper.writeValueAsString(entry);
+            
+            if (policy.ttl() != null) {
+                valueCommands.setex(key.toString(), policy.ttl().getSeconds(), entryJson).subscribe().with(r -> {});
+            } else {
+                valueCommands.set(key.toString(), entryJson).subscribe().with(r -> {});
+            }
+        } catch (JsonProcessingException e) {
+            log.warning("Cache put failed due to serialization error for key: " + key.toString());
+        }
     }
     
     private boolean isNegativeMarker(Object value) {
-        // e.g., if we cached an empty Optional or a specific error object
         if (value instanceof Optional<?> opt) {
             return opt.isEmpty();
         }

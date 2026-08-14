@@ -4,17 +4,17 @@ import io.quarkus.grpc.GrpcService;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import tech.kayys.wayang.pro.api.grpc.*;
 import tech.kayys.wayang.agent.AgentRequest;
 import tech.kayys.aljabr.orchestration.CoderOrchestrator;
+import tech.kayys.aljabr.api.entity.ChatMessageEntity;
+import tech.kayys.aljabr.api.repository.ChatMessageRepository;
 
 import java.util.UUID;
-import java.util.Map;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.time.Instant;
-import java.time.Duration;
 import java.util.logging.Logger;
 
 @GrpcService
@@ -25,27 +25,35 @@ public class ChatServiceImpl implements ChatService {
     @Inject
     CoderOrchestrator orchestrator;
 
-    private final Map<String, List<ChatMessage>> sessionMessages = new ConcurrentHashMap<>();
+    @Inject
+    ChatMessageRepository messageRepo;
 
     @Override
     public Uni<ListChatMessagesResponse> listMessages(ListChatMessagesRequest request) {
-        List<ChatMessage> messages = sessionMessages.getOrDefault(request.getSessionId(), new ArrayList<>());
-        return Uni.createFrom().item(ListChatMessagesResponse.newBuilder()
-                .addAllMessages(messages)
-                .build());
+        return messageRepo.find("sessionId", request.getSessionId()).list().map(entities -> {
+            List<ChatMessage> messages = entities.stream()
+                .map(this::toChatMessageProto)
+                .collect(Collectors.toList());
+            return ListChatMessagesResponse.newBuilder()
+                    .addAllMessages(messages)
+                    .build();
+        });
     }
 
     @Override
+    @WithTransaction
     public Uni<ChatMessage> addMessage(AddChatMessageRequest request) {
-        ChatMessage msg = ChatMessage.newBuilder()
-                .setId(UUID.randomUUID().toString())
-                .setSessionId(request.getSessionId())
-                .setRole(request.getRole())
-                .setContent(request.getContent())
-                .setCreatedAt(Instant.now().toString())
-                .build();
-        sessionMessages.computeIfAbsent(request.getSessionId(), k -> new ArrayList<>()).add(msg);
-        return Uni.createFrom().item(msg);
+        ChatMessageEntity msg = new ChatMessageEntity();
+        msg.id = UUID.randomUUID().toString();
+        msg.sessionId = request.getSessionId();
+        msg.role = request.getRole();
+        msg.content = request.getContent();
+        msg.toolCalls = request.getToolCalls();
+        msg.tokens = request.getTokens();
+        msg.model = request.getModel();
+        msg.createdAt = Instant.now().toString();
+
+        return messageRepo.persist(msg).map(this::toChatMessageProto);
     }
 
     @Override
@@ -74,5 +82,18 @@ public class ChatServiceImpl implements ChatService {
                 .onCompletion().continueWith(
                         RunAgentEvent.newBuilder().setType("DONE").setContent("Completed").build()
                 );
+    }
+
+    private ChatMessage toChatMessageProto(ChatMessageEntity m) {
+        return ChatMessage.newBuilder()
+                .setId(m.id != null ? m.id : "")
+                .setSessionId(m.sessionId != null ? m.sessionId : "")
+                .setRole(m.role != null ? m.role : "")
+                .setContent(m.content != null ? m.content : "")
+                .setToolCalls(m.toolCalls != null ? m.toolCalls : "")
+                .setTokens(m.tokens != null ? m.tokens : 0)
+                .setModel(m.model != null ? m.model : "")
+                .setCreatedAt(m.createdAt != null ? m.createdAt : "")
+                .build();
     }
 }
