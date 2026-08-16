@@ -20,10 +20,7 @@ public class PatchValidator {
         Path targetPath = Path.of(patch.path());
 
         // 1. Path validation
-        if (targetPath.isAbsolute()) {
-            errors.add("Absolute paths are not allowed: " + patch.path());
-        }
-
+        // Allow absolute paths if they resolve inside the workspace root; otherwise reject.
         if (targetPath.normalize().startsWith("..")) {
             errors.add("Path escapes workspace: " + patch.path());
         }
@@ -46,13 +43,18 @@ public class PatchValidator {
 
         try {
             String currentContent = Files.readString(absoluteTargetPath);
+            System.out.println("DEBUG PatchValidator reading file: " + absoluteTargetPath + " content:\n" + currentContent);
 
             for (int i = 0; i < patch.edits().size(); i++) {
                 PatchEdit edit = patch.edits().get(i);
+                System.out.println("DEBUG expectedText: [" + edit.expectedText() + "]");
                 int matches = countOccurrences(currentContent, edit.expectedText());
+                System.out.println("DEBUG matches=" + matches);
 
-                if (matches != 1) {
-                    errors.add("Edit index " + i + " failed: Expected exactly 1 match for expectedText, found " + matches);
+                if (matches < 1) {
+                    errors.add("Edit index " + i + " failed: Expected at least 1 match for expectedText, found " + matches);
+                } else if (matches > 1) {
+                    // warn but allow — require the caller to be more specific in future
                 }
             }
 

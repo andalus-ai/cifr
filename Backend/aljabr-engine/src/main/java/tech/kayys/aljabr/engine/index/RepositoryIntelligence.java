@@ -13,9 +13,10 @@ public interface RepositoryIntelligence {
 
     Uni<SearchResult> search(SearchRequest request, Path workspaceRoot, String workspaceId);
 
+    Uni<tech.kayys.aljabr.engine.index.symbol.SymbolInfo> symbol(tech.kayys.aljabr.engine.index.symbol.SymbolId id);
+
     // Future milestones will add:
-    // Uni<SymbolInfo> symbol(SymbolRequest request);
-    // Uni<List<Reference>> references(ReferenceRequest request);
-    // Uni<List<Dependency>> dependencies(DependencyRequest request);
-    // Uni<List<RelatedFile>> related(RelatedFileRequest request);
+    Uni<java.util.List<tech.kayys.aljabr.engine.index.reference.Reference>> references(tech.kayys.aljabr.engine.index.reference.ReferenceRequest request);
+    Uni<java.util.List<tech.kayys.aljabr.engine.index.dependency.Dependency>> dependencies(tech.kayys.aljabr.engine.index.dependency.DependencyRequest request);
+    Uni<java.util.List<tech.kayys.aljabr.engine.index.relation.RelatedFile>> related(tech.kayys.aljabr.engine.index.relation.RelatedFileRequest request);
 }

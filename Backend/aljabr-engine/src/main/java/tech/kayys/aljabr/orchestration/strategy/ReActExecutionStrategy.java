@@ -31,7 +31,14 @@ import java.util.stream.Collectors;
 public class ReActExecutionStrategy implements ExecutionStrategy {
 
     @Inject
-    InferenceBackend backend;
+    jakarta.enterprise.inject.Instance<InferenceBackend> backendInstance;
+
+    private InferenceBackend getBackend() {
+        if (backendInstance != null && backendInstance.isResolvable()) {
+            return backendInstance.get();
+        }
+        return null;
+    }
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -60,12 +67,19 @@ public class ReActExecutionStrategy implements ExecutionStrategy {
     }
 
     private Uni<AgentResponse> loop(List<ChatMessage> messages, List<ToolDefinition> toolDefs, AgentRequest request, AgentToolExecutor toolExecutor) {
+        InferenceBackend b = getBackend();
+        if (b == null) {
+            return Uni.createFrom().item(AgentResponse.builder()
+                    .content("No active InferenceBackend registered in runtime.")
+                    .build());
+        }
+
         InferenceRequest inferenceRequest = InferenceRequest.builder()
                 .messages(messages)
                 .tools(toolDefs)
                 .build();
 
-        return backend.infer(inferenceRequest).flatMap(response -> {
+        return b.infer(inferenceRequest).flatMap(response -> {
             AssistantMessage msg = response.message();
             messages.add(msg);
             

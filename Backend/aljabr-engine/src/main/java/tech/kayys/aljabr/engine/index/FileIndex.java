@@ -11,4 +11,8 @@ public interface FileIndex {
     Uni<List<FileRecord>> scanWorkspace(Path workspaceRoot);
     
     Uni<List<FileRecord>> getCurrentIndex(String workspaceId);
+
+    void registerFile(FileRecord record);
+
+    void clear();
 }

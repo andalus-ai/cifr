@@ -7,9 +7,12 @@ import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import tech.kayys.wayang.pro.api.grpc.*;
 import tech.kayys.aljabr.api.entity.ProjectEntity;
 import tech.kayys.aljabr.api.entity.SessionEntity;
+import tech.kayys.aljabr.api.entity.ChatMessageEntity;
 import tech.kayys.aljabr.api.repository.ProjectRepository;
 import tech.kayys.aljabr.api.repository.SessionRepository;
+import tech.kayys.aljabr.engine.index.indexer.WorkspaceIndexer;
 
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,6 +25,12 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Inject
     SessionRepository sessionRepo;
+
+    @Inject
+    tech.kayys.aljabr.api.repository.ChatMessageRepository chatMessageRepo;
+
+    @Inject
+    WorkspaceIndexer workspaceIndexer;
 
     @Override
     @WithTransaction
@@ -83,9 +92,84 @@ public class ProjectServiceImpl implements ProjectService {
                 s.projectId = orig.projectId;
                 s.name = orig.name + " (Fork)";
                 s.status = "QUEUED";
-                return sessionRepo.persist(s);
+                return sessionRepo.persist(s).flatMap(persistedSession -> {
+                    return chatMessageRepo.find("sessionId", request.getSessionId()).list()
+                        .flatMap(msgs -> {
+                            if (msgs.isEmpty()) {
+                                return Uni.createFrom().item(persistedSession);
+                            }
+                            List<ChatMessageEntity> toCopy = new java.util.ArrayList<>();
+                            for (ChatMessageEntity msg : msgs) {
+                                ChatMessageEntity copy = new ChatMessageEntity();
+                                copy.id = UUID.randomUUID().toString();
+                                copy.sessionId = persistedSession.id;
+                                copy.tenantId = msg.tenantId;
+                                copy.role = msg.role;
+                                copy.content = msg.content;
+                                copy.toolCalls = msg.toolCalls;
+                                copy.tokens = msg.tokens;
+                                copy.model = msg.model;
+                                copy.createdAt = msg.createdAt;
+                                toCopy.add(copy);
+                                if (request.getMessageId() != null && !request.getMessageId().isEmpty() && request.getMessageId().equals(msg.id)) {
+                                    break;
+                                }
+                            }
+                            return chatMessageRepo.persist(toCopy).map(v -> persistedSession);
+                        });
+                });
             })
             .map(this::toSessionProto);
+    }
+
+    @Override
+    @WithTransaction
+    public Uni<DeleteSessionResponse> deleteSession(DeleteSessionRequest request) {
+        return chatMessageRepo.delete("sessionId", request.getSessionId())
+            .flatMap(ignored -> sessionRepo.deleteById(request.getSessionId()))
+            .map(deleted -> DeleteSessionResponse.newBuilder().setSuccess(deleted).build());
+    }
+
+    @Override
+    public Uni<IndexWorkspaceResponse> indexWorkspace(IndexWorkspaceRequest request) {
+        String projectId = request.getProjectId();
+        String workspacePathStr = request.getWorkspacePath();
+
+        Uni<Path> rootUni;
+        if (workspacePathStr != null && !workspacePathStr.isBlank()) {
+            rootUni = Uni.createFrom().item(Path.of(workspacePathStr));
+        } else if (projectId != null && !projectId.isBlank()) {
+            rootUni = projectRepo.findById(projectId).map(p -> {
+                if (p != null && p.basePath != null && !p.basePath.isBlank()) {
+                    return Path.of(p.basePath);
+                }
+                return Path.of(".");
+            });
+        } else {
+            rootUni = Uni.createFrom().item(Path.of("."));
+        }
+
+        return rootUni.flatMap(root -> {
+            if (workspaceIndexer != null) {
+                return workspaceIndexer.index(root, projectId != null ? projectId : "default")
+                    .map(res -> IndexWorkspaceResponse.newBuilder()
+                        .setSuccess(true)
+                        .setFilesIndexed(res.filesIndexed())
+                        .setSymbolsIndexed(res.symbolsIndexed())
+                        .setDependenciesIndexed(res.dependenciesIndexed())
+                        .setDurationMs(res.durationMs())
+                        .setRepositoryHash(res.fingerprint() != null && res.fingerprint().repositoryHash() != null ? res.fingerprint().repositoryHash() : "")
+                        .build());
+            } else {
+                return Uni.createFrom().item(IndexWorkspaceResponse.newBuilder()
+                    .setSuccess(false)
+                    .setError("WorkspaceIndexer not available")
+                    .build());
+            }
+        }).onFailure().recoverWithItem(err -> IndexWorkspaceResponse.newBuilder()
+            .setSuccess(false)
+            .setError(err.getMessage() != null ? err.getMessage() : "Unknown error during indexing")
+            .build());
     }
 
     @Override

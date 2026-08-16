@@ -28,10 +28,38 @@ public class PatchApplier {
     @jakarta.inject.Inject
     GitRepositoryService gitService;
 
+    @jakarta.inject.Inject
+    MutationStore mutationStore;
+
+    @jakarta.inject.Inject
+    WorkspaceGuard workspaceGuard;
+
     public AppliedPatch apply(PatchOperation patch) {
+        // Idempotency: if we've already applied this mutation, return a no-op AppliedPatch
+        if (mutationStore.isApplied(patch.id())) {
+            log.info("Patch " + patch.id() + " already applied; returning current snapshot.");
+            RepositorySnapshot snapshot = gitService.captureSnapshot(WORKSPACE_ROOT);
+            return new AppliedPatch(patch.id(), new ChangeSet(new ArrayList<>()), snapshot);
+        }
+
         PatchValidationResult validation = validator.validate(patch);
         if (!validation.isValid()) {
             throw new IllegalArgumentException("Invalid patch: " + String.join(", ", validation.errors()));
+        }
+
+        // Workspace freshness check: prefer an attached RepositorySnapshot (captured
+        // during inspection) if present; fall back to expectedCommit string if set.
+        RepositorySnapshot baseline = null;
+        if (patch.expectedSnapshot() != null) {
+            baseline = patch.expectedSnapshot();
+        } else if (patch.expectedCommit() != null && !patch.expectedCommit().isBlank()) {
+            baseline = new RepositorySnapshot(patch.expectedCommit(), "unknown", false, java.util.List.of(), java.util.List.of());
+        }
+
+        java.util.Set<java.nio.file.Path> affected = java.util.Set.of(java.nio.file.Path.of(patch.path()));
+        WorkspaceCheck wc = workspaceGuard.check(baseline, affected);
+        if (!wc.ok()) {
+            throw new IllegalStateException("Workspace conflict detected: " + String.join(",", wc.conflicts()));
         }
 
         Path absoluteTargetPath = WORKSPACE_ROOT.resolve(patch.path()).normalize();
@@ -58,6 +86,10 @@ public class PatchApplier {
                 Id.random().asString()
             );
             records.add(record);
+
+            // record mutation for idempotency and evidence (include snapshot)
+            RepositorySnapshot appliedSnapshot = gitService.captureSnapshot(WORKSPACE_ROOT);
+            mutationStore.recordApplied(patch.id(), new ChangeSet(records), appliedSnapshot);
 
         } catch (IOException e) {
             throw new RuntimeException("Failed to apply patch to file: " + e.getMessage(), e);

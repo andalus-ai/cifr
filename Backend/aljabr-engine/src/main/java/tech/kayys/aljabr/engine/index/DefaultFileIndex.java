@@ -11,10 +11,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 @ApplicationScoped
 public class DefaultFileIndex implements FileIndex {
+
+    private final Map<Path, FileRecord> fileRecords = new ConcurrentHashMap<>();
 
     @Inject
     FileClassifier classifier;
@@ -23,8 +27,7 @@ public class DefaultFileIndex implements FileIndex {
     public Uni<WorkspaceFingerprint> computeFingerprint(Path workspaceRoot) {
         return Uni.createFrom().item(() -> {
             try {
-                // A very simple deterministic fingerprint based on file count and structure for R1
-                long fileCount = countFiles(workspaceRoot);
+                long fileCount = fileRecords.isEmpty() ? countFiles(workspaceRoot) : fileRecords.size();
                 String fakeHash = "repo-hash-" + fileCount;
                 return new WorkspaceFingerprint(fakeHash, "1.0", "cfg-hash-1");
             } catch (Exception e) {
@@ -44,12 +47,14 @@ public class DefaultFileIndex implements FileIndex {
                          try {
                              long size = Files.size(p);
                              String hash = computeHash(p);
-                             String lang = classifier.detectLanguage(p);
-                             boolean isGenerated = classifier.isGenerated(p);
-                             boolean isTest = classifier.isTest(p);
-                             FileRole role = classifier.classifyRole(p);
+                             String lang = classifier != null ? classifier.detectLanguage(p) : "unknown";
+                             boolean isGenerated = classifier != null && classifier.isGenerated(p);
+                             boolean isTest = classifier != null && classifier.isTest(p);
+                             FileRole role = classifier != null ? classifier.classifyRole(p) : FileRole.SOURCE;
                              
-                             records.add(new FileRecord(p, hash, size, lang, isGenerated, isTest, role));
+                             FileRecord rec = new FileRecord(p, hash, size, lang, isGenerated, isTest, role);
+                             registerFile(rec);
+                             records.add(rec);
                          } catch (IOException e) {
                              // Ignore unreadable files
                          }
@@ -63,16 +68,28 @@ public class DefaultFileIndex implements FileIndex {
 
     @Override
     public Uni<List<FileRecord>> getCurrentIndex(String workspaceId) {
-        // For R1, we return empty or stub, since actual persistence to Redis would be done in the orchestrator
-        return Uni.createFrom().item(new ArrayList<>());
+        return Uni.createFrom().item(new ArrayList<>(fileRecords.values()));
+    }
+
+    @Override
+    public void registerFile(FileRecord record) {
+        if (record != null && record.path() != null) {
+            fileRecords.put(record.path(), record);
+        }
+    }
+
+    @Override
+    public void clear() {
+        fileRecords.clear();
     }
     
     private boolean shouldInclude(Path path) {
         String pStr = path.toString();
-        return !pStr.contains("/.git/") && !pStr.contains("/.idea/");
+        return !pStr.contains("/.git/") && !pStr.contains("/.idea/") && !pStr.contains("/target/");
     }
 
     private long countFiles(Path root) throws IOException {
+        if (root == null || !Files.exists(root)) return 0;
         try (Stream<Path> paths = Files.walk(root)) {
             return paths.filter(Files::isRegularFile).filter(this::shouldInclude).count();
         }

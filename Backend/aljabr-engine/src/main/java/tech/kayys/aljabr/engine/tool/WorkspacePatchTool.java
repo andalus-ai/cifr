@@ -6,6 +6,8 @@ import tech.kayys.aljabr.engine.patch.AppliedPatch;
 import tech.kayys.aljabr.engine.patch.PatchApplier;
 import tech.kayys.aljabr.engine.patch.PatchEdit;
 import tech.kayys.aljabr.engine.patch.PatchOperation;
+import tech.kayys.aljabr.engine.repo.GitRepositoryService;
+import tech.kayys.aljabr.engine.repo.RepositorySnapshot;
 import tech.kayys.wayang.descriptor.CapabilityDescriptor;
 import tech.kayys.wayang.descriptor.ParameterDescriptor;
 import tech.kayys.wayang.extension.Id;
@@ -31,6 +33,11 @@ public class WorkspacePatchTool implements Tool {
 
     @Inject
     PatchApplier applier;
+
+    @Inject
+    GitRepositoryService gitService;
+
+    private static final java.nio.file.Path WORKSPACE_ROOT = java.nio.file.Paths.get(System.getProperty("user.dir"));
 
     @Override
     public ToolDescriptor descriptor() {
@@ -129,19 +136,49 @@ public class WorkspacePatchTool implements Tool {
                     ));
                 }
 
+                // Capture a baseline snapshot to pass to the applier so the
+                // WorkspaceGuard can perform a more robust freshness check.
+                RepositorySnapshot baseline = null;
+                try {
+                    baseline = gitService.captureSnapshot(WORKSPACE_ROOT);
+                } catch (Exception e) {
+                    // best-effort: if snapshot capture fails, continue with null baseline
+                }
+
                 PatchOperation patch = new PatchOperation(
                         UUID.randomUUID().toString(),
                         path,
                         edits,
-                        "Applied by tool"
+                        "Applied by tool",
+                        null,
+                        baseline
                 );
 
                 AppliedPatch result = applier.apply(patch);
-                
+
+                // build richer outputs from the applied change evidence
+                String beforeHash = null;
+                String afterHash = null;
+                int editsApplied = patch.edits().size();
+                if (result.changes() != null && !result.changes().changes().isEmpty()) {
+                    var cr = result.changes().changes().get(0);
+                    beforeHash = cr.beforeHash();
+                    afterHash = cr.afterHash();
+                }
+
+                String finalBefore = beforeHash;
+                String finalAfter = afterHash;
+
                 return new ToolResult() {
                     @Override
                     public Map<String, Object> getOutputs() {
-                        return Map.of("status", "success", "file", path);
+                        return Map.of(
+                                "status", "success",
+                                "file", path,
+                                "editsApplied", editsApplied,
+                                "beforeHash", finalBefore,
+                                "afterHash", finalAfter
+                        );
                     }
 
                     @Override

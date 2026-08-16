@@ -68,6 +68,30 @@ message ListSessionsResponse {
 
 message ForkSessionRequest {
   string session_id = 1;
+  string message_id = 2;
+}
+
+message DeleteSessionRequest {
+  string session_id = 1;
+}
+
+message DeleteSessionResponse {
+  bool success = 1;
+}
+
+message IndexWorkspaceRequest {
+  string project_id = 1;
+  string workspace_path = 2;
+}
+
+message IndexWorkspaceResponse {
+  bool success = 1;
+  int32 files_indexed = 2;
+  int32 symbols_indexed = 3;
+  int32 dependencies_indexed = 4;
+  int64 duration_ms = 5;
+  string repository_hash = 6;
+  string error = 7;
 }
 
 message UpdateSessionStatusRequest {
@@ -168,6 +192,8 @@ service ProjectService {
   rpc CreateSession (CreateSessionRequest) returns (Session);
   rpc ListSessions (ListSessionsRequest) returns (ListSessionsResponse);
   rpc ForkSession (ForkSessionRequest) returns (Session);
+  rpc DeleteSession (DeleteSessionRequest) returns (DeleteSessionResponse);
+  rpc IndexWorkspace (IndexWorkspaceRequest) returns (IndexWorkspaceResponse);
   rpc UpdateSessionStatus (UpdateSessionStatusRequest) returns (Session);
 }
 
@@ -188,6 +214,7 @@ message RunAgentRequest {
   string provider_id = 3;
   string model_id = 4;
   string workspace_path = 5;
+  string agent_profile = 6;
 }
 
 message RunAgentEvent {

@@ -94,12 +94,7 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
         
-        <!-- Java Parser for AST -->
-        <dependency>
-            <groupId>com.github.javaparser</groupId>
-            <artifactId>javaparser-core</artifactId>
-            <version>3.25.8</version>
-        </dependency>
+
         
         <!-- Sandbox SPI -->
         <!-- docker-java has been extracted to wayang-sandbox-docker -->

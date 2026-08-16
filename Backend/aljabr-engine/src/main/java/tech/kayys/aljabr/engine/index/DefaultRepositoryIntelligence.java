@@ -42,4 +42,36 @@ public class DefaultRepositoryIntelligence implements RepositoryIntelligence {
         // Default to text search
         return textSearchEngine.search(request, workspaceRoot);
     }
+    
+    @Inject
+    tech.kayys.aljabr.engine.index.symbol.SymbolIndex symbolIndex;
+
+    @Override
+    public Uni<tech.kayys.aljabr.engine.index.symbol.SymbolInfo> symbol(tech.kayys.aljabr.engine.index.symbol.SymbolId id) {
+        return symbolIndex.getSymbol(id);
+    }
+    
+    @Inject
+    tech.kayys.aljabr.engine.index.reference.ReferenceIndex referenceIndex;
+
+    @Override
+    public Uni<java.util.List<tech.kayys.aljabr.engine.index.reference.Reference>> references(tech.kayys.aljabr.engine.index.reference.ReferenceRequest request) {
+        return referenceIndex.getReferences(request);
+    }
+
+    @Inject
+    tech.kayys.aljabr.engine.index.dependency.DependencyIndex dependencyIndex;
+
+    @Inject
+    tech.kayys.aljabr.engine.index.relation.RelationIndex relationIndex;
+
+    @Override
+    public Uni<java.util.List<tech.kayys.aljabr.engine.index.dependency.Dependency>> dependencies(tech.kayys.aljabr.engine.index.dependency.DependencyRequest request) {
+        return dependencyIndex.getDependencies(request);
+    }
+
+    @Override
+    public Uni<java.util.List<tech.kayys.aljabr.engine.index.relation.RelatedFile>> related(tech.kayys.aljabr.engine.index.relation.RelatedFileRequest request) {
+        return relationIndex.getRelatedFiles(request);
+    }
 }
