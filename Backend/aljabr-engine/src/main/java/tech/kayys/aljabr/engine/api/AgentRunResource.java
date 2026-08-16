@@ -38,39 +38,9 @@ public class AgentRunResource {
 
     private final ScheduledExecutorService exec = Executors.newSingleThreadScheduledExecutor();
 
-    private String toJson(Object o) {
-        if (o == null) return "null";
-        if (o instanceof String) return '"' + ((String) o).replace("\"", "\\\"") + '"';
-        if (o instanceof Number || o instanceof Boolean) return o.toString();
-        if (o instanceof Map) {
-            Map m = (Map) o;
-            StringBuilder sb = new StringBuilder();
-            sb.append('{');
-            boolean first = true;
-            for (Object entryObj : m.entrySet()) {
-                Map.Entry entry = (Map.Entry) entryObj;
-                if (!first) sb.append(',');
-                first = false;
-                sb.append(toJson(String.valueOf(entry.getKey()))).append(':').append(toJson(entry.getValue()));
-            }
-            sb.append('}');
-            return sb.toString();
-        }
-        if (o instanceof List) {
-            List l = (List) o;
-            StringBuilder sb = new StringBuilder();
-            sb.append('[');
-            boolean first = true;
-            for (Object item : l) {
-                if (!first) sb.append(',');
-                first = false;
-                sb.append(toJson(item));
-            }
-            sb.append(']');
-            return sb.toString();
-        }
-        return '"' + o.toString().replace("\"", "\\\"") + '"';
-    }
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+            .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @POST
     @Path("start")
@@ -86,8 +56,11 @@ public class AgentRunResource {
                 if (sink == null || sink.isClosed()) return;
                 Map<String, Object> out = new HashMap<>();
                 out.put("event", ev.getClass().getSimpleName());
-                out.put("data", ev);
-                sink.send(sse.newEventBuilder().name("agent-event").data(String.class, toJson(out)).build());
+                // convert the record into a map for stable JSON shape
+                Map data = mapper.convertValue(ev, Map.class);
+                out.put("data", data);
+                String payload = mapper.writeValueAsString(out);
+                sink.send(sse.newEventBuilder().name("agent-event").data(String.class, payload).build());
             } catch (Exception ex) {
                 // ignore send errors
             }
@@ -109,16 +82,28 @@ public class AgentRunResource {
                 .subscribe().with(response -> {
                     try {
                         if (sink == null || sink.isClosed()) return;
-                        sink.send(sse.newEventBuilder().name("done").data(String.class, toJson(Map.of("event","done","result", response.metadata()))).build());
+                        Map<String, Object> out = new HashMap<>();
+                        out.put("event", "done");
+                        out.put("result", mapper.convertValue(response.metadata(), Map.class));
+                        String payload = mapper.writeValueAsString(out);
+                        sink.send(sse.newEventBuilder().name("done").data(String.class, payload).build());
                         sink.close();
+                    } catch (Exception ex) {
+                        // noop
                     } finally {
                         eventLedger.unregisterListener(listener);
                     }
                 }, err -> {
                     try {
                         if (sink == null || sink.isClosed()) return;
-                        sink.send(sse.newEventBuilder().name("error").data(String.class, toJson(Map.of("event","error","message", err.getMessage()))).build());
+                        Map<String, Object> out = new HashMap<>();
+                        out.put("event", "error");
+                        out.put("message", err.getMessage());
+                        String payload = mapper.writeValueAsString(out);
+                        sink.send(sse.newEventBuilder().name("error").data(String.class, payload).build());
                         sink.close();
+                    } catch (Exception ex) {
+                        // noop
                     } finally {
                         eventLedger.unregisterListener(listener);
                     }
