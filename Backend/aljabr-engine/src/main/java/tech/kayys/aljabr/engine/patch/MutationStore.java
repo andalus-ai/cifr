@@ -63,4 +63,36 @@ public class MutationStore {
             throw new RuntimeException("Failed to record mutation: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Lists applied mutation ids found in the mutations store.
+     */
+    public java.util.List<String> listApplied() {
+        try {
+            if (!Files.exists(STORE_DIR)) return java.util.List.of();
+            try (var s = Files.list(STORE_DIR)) {
+                return s
+                        .filter(p -> p.getFileName().toString().endsWith(".record"))
+                        .map(p -> p.getFileName().toString().replaceFirst("\\.record$", ""))
+                        .sorted()
+                        .toList();
+            }
+        } catch (IOException e) {
+            log.warning("failed to list mutation store: " + e.getMessage());
+            return java.util.List.of();
+        }
+    }
+
+    /**
+     * Read a mutation record's raw content.
+     */
+    public String readRecord(String id) {
+        try {
+            Path p = STORE_DIR.resolve(id + ".record");
+            if (!Files.exists(p)) return null;
+            return Files.readString(p);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read mutation record: " + e.getMessage(), e);
+        }
+    }
 }
