@@ -25,6 +25,9 @@ public class DefaultEventLedger implements EventLedger {
     private final ObjectMapper mapper;
     private final List<AgentEvent> events = new ArrayList<>();
 
+    // Simple listener support so callers (like SSE endpoints) can subscribe to live events.
+    private final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<AgentEvent>> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
     public DefaultEventLedger() {
         this.mapper = new ObjectMapper();
         this.mapper.registerModule(new JavaTimeModule());
@@ -47,6 +50,23 @@ public class DefaultEventLedger implements EventLedger {
         log.info("EventLedger recording: " + event.getClass().getSimpleName());
         events.add(event);
         saveEvents();
+
+        // notify listeners asynchronously to avoid blocking the main flow
+        for (java.util.function.Consumer<AgentEvent> l : listeners) {
+            try {
+                l.accept(event);
+            } catch (Exception ex) {
+                log.warning("Event listener threw: " + ex.getMessage());
+            }
+        }
+    }
+
+    public void registerListener(java.util.function.Consumer<AgentEvent> listener) {
+        listeners.add(listener);
+    }
+
+    public void unregisterListener(java.util.function.Consumer<AgentEvent> listener) {
+        listeners.remove(listener);
     }
 
     private void loadEvents() throws IOException {
