@@ -10,6 +10,8 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.sse.Sse;
 import jakarta.ws.rs.sse.SseEventSink;
 import tech.kayys.aljabr.engine.repo.GitRepositoryService;
+import tech.kayys.aljabr.orchestration.CoderOrchestrator;
+import tech.kayys.aljabr.engine.event.DefaultEventLedger;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -59,8 +61,8 @@ public class AgentRunResource {
                 // convert the record into a map for stable JSON shape
                 Map data = mapper.convertValue(ev, Map.class);
                 out.put("data", data);
-                String payload = mapper.writeValueAsString(out);
-                sink.send(sse.newEventBuilder().name("agent-event").data(String.class, payload).build());
+                String payloadJson = mapper.writeValueAsString(out);
+                sink.send(sse.newEventBuilder().name("agent-event").data(String.class, payloadJson).build());
             } catch (Exception ex) {
                 // ignore send errors
             }
@@ -74,7 +76,6 @@ public class AgentRunResource {
         tech.kayys.wayang.agent.AgentRequest agentRequest = tech.kayys.wayang.agent.AgentRequest.builder()
                 .sessionId((String) payload.getOrDefault("sessionId", "local-session"))
                 .content(request)
-                .parameters(params)
                 .build();
 
         // Run orchestrator asynchronously and close stream when done
@@ -85,8 +86,8 @@ public class AgentRunResource {
                         Map<String, Object> out = new HashMap<>();
                         out.put("event", "done");
                         out.put("result", mapper.convertValue(response.metadata(), Map.class));
-                        String payload = mapper.writeValueAsString(out);
-                        sink.send(sse.newEventBuilder().name("done").data(String.class, payload).build());
+                        String payloadJson = mapper.writeValueAsString(out);
+                        sink.send(sse.newEventBuilder().name("done").data(String.class, payloadJson).build());
                         sink.close();
                     } catch (Exception ex) {
                         // noop
@@ -99,8 +100,8 @@ public class AgentRunResource {
                         Map<String, Object> out = new HashMap<>();
                         out.put("event", "error");
                         out.put("message", err.getMessage());
-                        String payload = mapper.writeValueAsString(out);
-                        sink.send(sse.newEventBuilder().name("error").data(String.class, payload).build());
+                        String payloadJson = mapper.writeValueAsString(out);
+                        sink.send(sse.newEventBuilder().name("error").data(String.class, payloadJson).build());
                         sink.close();
                     } catch (Exception ex) {
                         // noop
