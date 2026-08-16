@@ -10,6 +10,11 @@ import tech.kayys.wayang.agent.AgentRequest;
 import tech.kayys.aljabr.orchestration.CoderOrchestrator;
 import tech.kayys.aljabr.api.entity.ChatMessageEntity;
 import tech.kayys.aljabr.api.repository.ChatMessageRepository;
+import tech.kayys.aljabr.engine.event.DefaultEventLedger;
+import tech.kayys.aljabr.api.agent.AgentEvent;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.util.UUID;
 import java.util.List;
@@ -27,6 +32,11 @@ public class ChatServiceImpl implements ChatService {
 
     @Inject
     ChatMessageRepository messageRepo;
+
+    @Inject
+    DefaultEventLedger eventLedger;
+
+    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @Override
     public Uni<ListChatMessagesResponse> listMessages(ListChatMessagesRequest request) {
@@ -70,18 +80,41 @@ public class ChatServiceImpl implements ChatService {
                 .sessionId(request.getSessionId())
                 .content(request.getPrompt())
                 .build();
-                
-        return orchestrator.stream(agentReq)
+
+        // Stream of plain text responses from orchestrator
+        Multi<RunAgentEvent> textStream = orchestrator.stream(agentReq)
                 .map(response -> {
                     String text = response.content() != null ? response.content() : "";
                     return RunAgentEvent.newBuilder()
                             .setType("TEXT")
                             .setContent(text)
                             .build();
-                })
-                .onCompletion().continueWith(
-                        RunAgentEvent.newBuilder().setType("DONE").setContent("Completed").build()
-                );
+                });
+
+        // Stream of recorded AgentEvent from the EventLedger
+        Multi<RunAgentEvent> ledgerStream = Multi.createFrom().emitter(emitter -> {
+            java.util.function.Consumer<AgentEvent> listener = ev -> {
+                try {
+                    // convert event to map and serialize as payload JSON
+                    java.util.Map data = mapper.convertValue(ev, java.util.Map.class);
+                    data.put("eventType", ev.getClass().getSimpleName());
+                    String payload = mapper.writeValueAsString(data);
+                    RunAgentEvent evMsg = RunAgentEvent.newBuilder()
+                            .setType(ev.getClass().getSimpleName())
+                            .setPayload(payload)
+                            .build();
+                    emitter.emit(evMsg);
+                } catch (Exception ex) {
+                    // ignore
+                }
+            };
+            eventLedger.registerListener(listener);
+            emitter.onTermination(() -> eventLedger.unregisterListener(listener));
+        });
+
+        // Merge both streams; ensure a DONE event when orchestrator completes
+        return Multi.createBy().merging().streams(textStream, ledgerStream)
+                .onCompletion().continueWith(RunAgentEvent.newBuilder().setType("DONE").setContent("Completed").build());
     }
 
     private ChatMessage toChatMessageProto(ChatMessageEntity m) {
