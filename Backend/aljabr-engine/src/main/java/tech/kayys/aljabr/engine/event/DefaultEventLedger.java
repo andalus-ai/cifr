@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.logging.Logger;
 
 @ApplicationScoped
-public class DefaultEventLedger implements EventLedger {
+public class DefaultEventLedger implements tech.kayys.aljabr.engine.event.EventLedger {
     private static final Logger log = Logger.getLogger(DefaultEventLedger.class.getName());
     private static final Path LEDGER_DIR = Paths.get(System.getProperty("user.dir"), ".aljabr", "ledger");
     private static final Path EVENTS_FILE = LEDGER_DIR.resolve("events.json");
