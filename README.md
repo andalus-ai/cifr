@@ -29,7 +29,7 @@ Aljabr bridges the gap between interactive IDE assistants and fully autonomous a
 Aljabr operates across three coordinated tiers:
 1. **Frontend Tier (`aljabr_gui`)**: A desktop IDE interface written in Flutter (Riverpod state management) providing side-by-side Code/Diff/Terminal/Problems views, context pinning (`@` mentions), live plan tracking, and verification status badges.
 2. **Backend Engine Tier (`aljabr-engine` & `aljabr-api`)**: A reactive Quarkus service (Java 25) implementing the cognitive lifecycle: Reasoning Gate $\to$ Context Planning $\to$ Mutation Engine $\to$ Verification Ladder $\to$ Closed-Loop Autonomous Repair.
-3. **LSP & Tool Substrate (`muqabalah`)**: A headless LSP and Debug Adapter Protocol (DAP) kernel managing language servers, symbol tables, Open VSX extensions, and AST indexers.
+3. **LSP & Tool Substrate (`muqabala`)**: A headless LSP and Debug Adapter Protocol (DAP) kernel managing language servers, symbol tables, Open VSX extensions, and AST indexers.
 
 ```mermaid
 graph TB
@@ -52,7 +52,7 @@ graph TB
     end
 
     subgraph Substrate ["Infrastructure & Toolchains"]
-        LSP["Muqabalah LSP Kernel (gRPC / WS)"]
+        LSP["Muqabala LSP Kernel (gRPC / WS)"]
         TC["Multi-Language Toolchains (Maven, CMake, SwiftPM, Xcode, Flutter, Sonar)"]
         SANDBOX["Confined Process Sandbox & Tool Policy"]
     end
@@ -259,8 +259,8 @@ Aljabr automatically discovers project toolchains and executes builds, tests, fo
 
 ### 1. Build Backend & LSP Kernel
 ```bash
-# Build headless LSP Kernel (Muqabalah)
-cd Wayang-Projects/Utilities/muqabalah
+# Build headless LSP Kernel (Muqabala)
+cd Wayang-Projects/Utilities/muqabala
 mvn clean package -DskipTests
 
 # Build Aljabr Engine & API

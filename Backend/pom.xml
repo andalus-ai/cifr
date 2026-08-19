@@ -17,7 +17,7 @@
     <packaging>pom</packaging>
 
     <name>Aljabr - Parent</name>
-    <description>Aljabr Enterprise Features</description>
+    <description>Aljabr Autonomous Coding Agent Subsystem</description>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -37,14 +37,6 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-        <profiles>
-        <profile>
-            <id>pro-enterprise-addons</id>
-            <modules>
-                
-            </modules>
-        </profile>
-    </profiles>
 
     <build>
         <pluginManagement>
@@ -59,8 +51,11 @@
     </build>
 
     <modules>
-        <module>aljabr-api</module>
+        <module>aljabr-core</module>
+        <module>aljabr-skills</module>
+        <module>aljabr-toolchains</module>
         <module>aljabr-engine</module>
+        <module>aljabr-api</module>
     </modules>
 
 </project>

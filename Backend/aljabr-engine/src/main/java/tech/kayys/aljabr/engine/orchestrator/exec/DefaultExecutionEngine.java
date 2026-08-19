@@ -4,18 +4,19 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+import tech.kayys.aljabr.engine.exec.ExecutionResult;
 import tech.kayys.aljabr.engine.orchestrator.ResolvedTool;
 import tech.kayys.aljabr.engine.orchestrator.output.DefaultOutputProcessor;
-import tech.kayys.aljabr.engine.orchestrator.output.ExecutionStatus;
 import tech.kayys.aljabr.engine.orchestrator.output.OutputProcessor;
-import tech.kayys.aljabr.engine.orchestrator.output.ProcessedOutput;
 import tech.kayys.aljabr.engine.orchestrator.policy.ExecutionBudget;
+import tech.kayys.aljabr.engine.verify.Diagnostic;
+import tech.kayys.aljabr.engine.verify.DiagnosticSeverity;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.Map;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -27,8 +28,7 @@ public class DefaultExecutionEngine implements ExecutionEngine {
     @Inject
     OutputProcessor outputProcessor;
 
-    public DefaultExecutionEngine() {
-    }
+    public DefaultExecutionEngine() {}
 
     public DefaultExecutionEngine(OutputProcessor outputProcessor) {
         this.outputProcessor = outputProcessor;
@@ -42,8 +42,13 @@ public class DefaultExecutionEngine implements ExecutionEngine {
             OutputProcessor processor = outputProcessor != null ? outputProcessor : new DefaultOutputProcessor();
 
             if (tool == null || tool.command().isEmpty()) {
-                ProcessedOutput out = processor.process(1, "", "No command provided", currentBudget.maxOutputBytes()).await().indefinitely();
-                return new ExecutionResult(executionId, ExecutionStatus.FAILED, 1, Duration.ZERO, out);
+                ExecutionResult failed = new ExecutionResult(
+                    -1, "", "No command provided",
+                    List.of(new Diagnostic(DiagnosticSeverity.ERROR.name(), null, -1, -1, "No command provided")),
+                    Optional.empty(), false
+                );
+                processor.process(executionId, failed).await().indefinitely();
+                return failed;
             }
 
             try {
@@ -51,51 +56,56 @@ public class DefaultExecutionEngine implements ExecutionEngine {
                 if (tool.workingDirectory() != null) {
                     pb.directory(tool.workingDirectory().toFile());
                 }
-
-                // Sandbox environment inheritance
-                Map<String, String> env = pb.environment();
                 if (tool.environment() != null) {
+                    var env = pb.environment();
                     env.clear();
-                    for (String allowedKey : tool.environment().allowedInheritedVariables()) {
-                        String val = System.getenv(allowedKey);
-                        if (val != null) {
-                            env.put(allowedKey, val);
-                        }
+                    for (String key : tool.environment().allowedInheritedVariables()) {
+                        String val = System.getenv(key);
+                        if (val != null) env.put(key, val);
                     }
                     env.putAll(tool.environment().variables());
                 }
 
-                LOG.infof("Starting process [%s]: %s in %s", executionId, String.join(" ", tool.command()), tool.workingDirectory());
+                LOG.infof("Starting process [%s]: %s", executionId, String.join(" ", tool.command()));
                 Process process = pb.start();
 
-                // Read output asynchronously
                 CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> readStream(process.getInputStream()));
                 CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> readStream(process.getErrorStream()));
 
                 boolean finished = process.waitFor(currentBudget.timeout().toMillis(), TimeUnit.MILLISECONDS);
-                long durationMs = System.currentTimeMillis() - startTime;
 
                 if (!finished) {
-                    LOG.warnf("Process [%s] timed out after %d ms. Forcibly terminating.", executionId, currentBudget.timeout().toMillis());
                     process.destroyForcibly();
-                    ProcessedOutput out = processor.process(-1, "", "Process timed out after " + currentBudget.timeout(), currentBudget.maxOutputBytes()).await().indefinitely();
-                    return new ExecutionResult(executionId, ExecutionStatus.TIMEOUT, -1, Duration.ofMillis(durationMs), out);
+                    ExecutionResult timedOut = new ExecutionResult(
+                        -1, "", "Process timed out after " + currentBudget.timeout(),
+                        List.of(new Diagnostic(DiagnosticSeverity.ERROR.name(), null, -1, -1, "Timeout")),
+                        Optional.empty(), true
+                    );
+                    processor.process(executionId, timedOut).await().indefinitely();
+                    return timedOut;
                 }
 
                 int exitCode = process.exitValue();
                 String stdout = stdoutFuture.get(2, TimeUnit.SECONDS);
                 String stderr = stderrFuture.get(2, TimeUnit.SECONDS);
 
-                ProcessedOutput processed = processor.process(exitCode, stdout, stderr, currentBudget.maxOutputBytes()).await().indefinitely();
-                ExecutionStatus status = exitCode == 0 ? ExecutionStatus.SUCCESS : ExecutionStatus.FAILED;
+                List<Diagnostic> diagnostics = exitCode != 0
+                    ? List.of(new Diagnostic(DiagnosticSeverity.ERROR.name(), null, -1, -1, "Exit code " + exitCode))
+                    : List.of();
 
-                LOG.infof("Process [%s] finished with exitCode=%d in %d ms", executionId, exitCode, durationMs);
-                return new ExecutionResult(executionId, status, exitCode, Duration.ofMillis(durationMs), processed);
+                ExecutionResult result = new ExecutionResult(exitCode, stdout, stderr, diagnostics, Optional.empty(), false);
+                processor.process(executionId, result).await().indefinitely();
+                LOG.infof("Process [%s] finished with exitCode=%d", executionId, exitCode);
+                return result;
 
             } catch (Exception e) {
-                LOG.errorf("Error executing process [%s]: %s", executionId, e.getMessage());
-                ProcessedOutput out = processor.process(1, "", "Execution failed: " + e.getMessage(), currentBudget.maxOutputBytes()).await().indefinitely();
-                return new ExecutionResult(executionId, ExecutionStatus.CRASHED, 1, Duration.ofMillis(System.currentTimeMillis() - startTime), out);
+                ExecutionResult crashed = new ExecutionResult(
+                    -1, "", "Execution failed: " + e.getMessage(),
+                    List.of(new Diagnostic(DiagnosticSeverity.ERROR.name(), null, -1, -1, e.getMessage())),
+                    Optional.empty(), false
+                );
+                processor.process(executionId, crashed).await().indefinitely();
+                return crashed;
             }
         });
     }
@@ -104,9 +114,7 @@ public class DefaultExecutionEngine implements ExecutionEngine {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
             StringBuilder sb = new StringBuilder();
             String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append("\n");
-            }
+            while ((line = reader.readLine()) != null) sb.append(line).append("\n");
             return sb.toString();
         } catch (Exception e) {
             return "Error reading stream: " + e.getMessage();

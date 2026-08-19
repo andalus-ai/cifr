@@ -4,6 +4,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import tech.kayys.aljabr.engine.skill.ReasoningMode;
 import tech.kayys.aljabr.engine.skill.SkillContext;
 import tech.kayys.aljabr.engine.skill.SkillDescriptor;
+import tech.kayys.aljabr.engine.skill.reasoning.ReasoningDecision;
+import tech.kayys.aljabr.engine.skill.reasoning.ReasoningGate;
 
 @ApplicationScoped
 public class DefaultReasoningGate implements ReasoningGate {

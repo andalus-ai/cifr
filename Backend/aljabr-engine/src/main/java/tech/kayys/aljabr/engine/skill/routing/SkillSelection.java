@@ -1,5 +1,6 @@
 package tech.kayys.aljabr.engine.skill.routing;
 
+import tech.kayys.aljabr.engine.skill.reasoning.ReasoningDecision;
 import java.util.Map;
 
 public record SkillSelection(

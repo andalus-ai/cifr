@@ -59,22 +59,22 @@ public class AljabrMcpAdapter {
                 }
             }
 
-            String muqabalahEnv = System.getenv("MUQABALAH_MCP_ENDPOINT");
-            if (muqabalahEnv == null || muqabalahEnv.isBlank()) {
-                muqabalahEnv = System.getProperty("muqabalah.mcp.endpoint");
+            String muqabalaEnv = System.getenv("MUQABALAH_MCP_ENDPOINT");
+            if (muqabalaEnv == null || muqabalaEnv.isBlank()) {
+                muqabalaEnv = System.getProperty("muqabala.mcp.endpoint");
             }
-            if (muqabalahEnv == null || muqabalahEnv.isBlank()) {
-                muqabalahEnv = "http://localhost:8080/mcp/sse";
+            if (muqabalaEnv == null || muqabalaEnv.isBlank()) {
+                muqabalaEnv = "http://localhost:8080/mcp/sse";
             }
 
-            if (configPath == null && muqabalahEnv.isBlank()) {
+            if (configPath == null && muqabalaEnv.isBlank()) {
                 return tools;
             }
 
             HttpMcpToolDiscoveryClient discoveryClient = new HttpMcpToolDiscoveryClient();
             HttpMcpToolClient mcpClient = new HttpMcpToolClient();
 
-            boolean muqabalahFound = false;
+            boolean muqabalaFound = false;
 
             if (configPath != null) {
                 JsonNode root = MAPPER.readTree(configPath.toFile());
@@ -118,15 +118,15 @@ public class AljabrMcpAdapter {
                         }
                     });
 
-                    if (servers.has("muqabalah")) {
-                        muqabalahFound = true;
+                    if (servers.has("muqabala")) {
+                        muqabalaFound = true;
                     }
                 }
             }
 
-            if (!muqabalahFound && muqabalahEnv != null && !muqabalahEnv.isBlank()) {
-                String serverName = "muqabalah";
-                String endpoint = muqabalahEnv;
+            if (!muqabalaFound && muqabalaEnv != null && !muqabalaEnv.isBlank()) {
+                String serverName = "muqabala";
+                String endpoint = muqabalaEnv;
                 Map<String, Object> context = new HashMap<>();
                 context.put("mcpEndpoint", endpoint);
 

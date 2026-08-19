@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # ── Aljabr / Wayang Cognitive Agent & Substrate Backend ───────────────────
+  aljabr-backend:
+    image: ghcr.io/kayys-tech/aljabr-backend:0.1.0
+    container_name: aljabr-backend
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+      - "9000:9000"
+    environment:
+      - QUARKUS_HTTP_PORT=8085
+      - QUARKUS_GRPC_SERVER_PORT=9000
+      - QUARKUS_GRPC_SERVER_USE_SEPARATE_SERVER=false
+      - GOLLEK_INFERENCE_URL=http://gollek-inference:8080
+      - GOLLEK_GRPC_HOST=gollek-inference
+      - GOLLEK_GRPC_PORT=9090
+      - DB_URL=jdbc:postgresql://postgres-db:5432/wayang_aljabr
+      - DB_USER=aljabr_user
+      - DB_PASSWORD=aljabr_secure_pass
+      - REDIS_HOSTS=redis://redis-cluster:6379
+      - OIDC_AUTH_SERVER_URL=http://keycloak-sso:8080/realms/aljabr
+      - AUDIT_TRAIL_ENABLED=true
+    depends_on:
+      - gollek-inference
+      - postgres-db
+      - redis-cluster
+    networks:
+      - aljabr-net
+
+  # ── Gollek Local / Clustered Neural Inference Server ──────────────────────
+  gollek-inference:
+    image: ghcr.io/kayys-tech/gollek-inference-server:0.1.0
+    container_name: gollek-inference
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - GOLLEK_HTTP_PORT=8080
+      - GOLLEK_GRPC_PORT=9090
+      - GOLLEK_BACKEND=metal_or_cuda
+      - GOLLEK_KV_CACHE_SIZE=4096
+      - GOLLEK_MODEL_PATH=/models
+    volumes:
+      - ./models:/models:ro
+    # Enable NVIDIA GPU access if available on Linux host:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    networks:
+      - aljabr-net
+
+  # ── Enterprise Storage & Checkpoint DB (PostgreSQL + pgvector) ────────────
+  postgres-db:
+    image: pgvector/pgvector:pg16
+    container_name: aljabr-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=wayang_aljabr
+      - POSTGRES_USER=aljabr_user
+      - POSTGRES_PASSWORD=aljabr_secure_pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - aljabr-net
+
+  # ── High-Speed Session & Checkpoint Cache (Redis) ─────────────────────────
+  redis-cluster:
+    image: redis:7.2-alpine
+    container_name: aljabr-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - aljabr-net
+
+  # ── Enterprise Identity & Single Sign-On (Keycloak OIDC) ──────────────────
+  keycloak-sso:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: aljabr-keycloak
+    restart: unless-stopped
+    command: start-dev
+    ports:
+      - "8088:8080"
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin_secure_pass
+    networks:
+      - aljabr-net
+
+  # ── Enterprise Metrics & Observability (Prometheus) ───────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: aljabr-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - aljabr-net
+
+  # ── Telemetry & KPI Dashboards (Grafana) ──────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: aljabr-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafanadata:/var/lib/grafana
+    networks:
+      - aljabr-net
+
+volumes:
+  pgdata:
+  redisdata:
+  grafanadata:
+
+networks:
+  aljabr-net:
+    driver: bridge

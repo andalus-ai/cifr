@@ -44,7 +44,7 @@ I would make the relationship:
         ┌───────────────────┼────────────────────┐
         ▼                   ▼                    ▼
    Repository          Code Intelligence      Execution
-   understanding       Muqabalah/LSP          sandbox
+   understanding       Muqabala/LSP          sandbox
    semantic search     symbols                terminal
    file graph          refs/defs              tests
    change tracking     diagnostics             builds
@@ -102,11 +102,11 @@ That's a good base because Aljabr needs a **repository perception layer**, not j
 
 ---
 
-**3. Muqabalah integration is the right move**
+**3. Muqabala integration is the right move**
 
 This is probably one of the most important architectural decisions.
 
-The current prompt explicitly establishes Muqabalah as the IDE/LSP boundary and exposes things such as definition, references, document symbols and workspace symbols through Aljabr skills.
+The current prompt explicitly establishes Muqabala as the IDE/LSP boundary and exposes things such as definition, references, document symbols and workspace symbols through Aljabr skills.
 
 So:
 
@@ -114,7 +114,7 @@ So:
 RAG
   = "what text looks relevant?"
 
-Muqabalah
+Muqabala
   = "what does this code actually mean?"
 
 Git
@@ -580,7 +580,7 @@ For example:
 
 ```text
 "Wayang uses Maven."
-"Muqabalah owns LSP."
+"Muqabala owns LSP."
 "Never put LSP implementation inside Aljabr."
 ```
 
@@ -703,7 +703,7 @@ rather than one enormous permanent system prompt.
 
 # 11. MCP should be capability discovery, not a special Aljabr subsystem
 
-Your `AljabrMcpAdapter` is already discovering workspace MCP configuration and Muqabalah. 
+Your `AljabrMcpAdapter` is already discovering workspace MCP configuration and Muqabala. 
 
 I'd move toward:
 
@@ -1044,7 +1044,7 @@ Build
 Diagnostics
 ```
 
-### Muqabalah
+### Muqabala
 
 **Language/IDE intelligence**
 
@@ -1069,7 +1069,7 @@ And then:
               │           │
               └─────┬─────┘
                     │
-               Muqabalah
+               Muqabala
 ```
 
 That boundary is excellent.
@@ -1126,7 +1126,7 @@ Checkpoint/rollback
 ### Phase 3 — Coding intelligence
 
 ```text
-Muqabalah capability registry
+Muqabala capability registry
 Project detector
 Build/test strategy
 Diagnostics → repair
@@ -1182,7 +1182,7 @@ User:
        └─────────────────┘
 
           ↓           ↓
-     Muqabalah     Sandbox
+     Muqabala     Sandbox
        code          build
      intelligence    tests
 
@@ -1200,7 +1200,7 @@ User:
 
 **That would make Aljabr genuinely different from "Wayang + a coding prompt."**
 
-And I think your current code is at the point where **the next move should be architectural consolidation rather than adding more individual skills**. You already have workspace/RAG tools, MCP, skills, Muqabalah/LSP integration, memory policy, runtime registration, API exposure, and a GUI event model.
+And I think your current code is at the point where **the next move should be architectural consolidation rather than adding more individual skills**. You already have workspace/RAG tools, MCP, skills, Muqabala/LSP integration, memory policy, runtime registration, API exposure, and a GUI event model.
 
 The missing center is essentially:
 
@@ -2254,7 +2254,7 @@ rename
 code_actions
 ```
 
-You already have Muqabalah-backed skills for definition/references/workspace symbols. 
+You already have Muqabala-backed skills for definition/references/workspace symbols. 
 
 ### Execution
 
@@ -2272,7 +2272,7 @@ dap_launch
 dap_terminate
 ```
 
-You already have a `DapSessionSkill` backed by Muqabalah's debug tool. 
+You already have a `DapSessionSkill` backed by Muqabala's debug tool. 
 
 ---
 
@@ -2720,7 +2720,7 @@ Wayang owns:
 Aljabr owns:
     "How should a coding task progress?"
 
-Muqabalah owns:
+Muqabala owns:
     "What does the code mean?"
 
 Sandbox owns:
@@ -3189,7 +3189,7 @@ This is where:
 
 * RAG
 * semantic search
-* Muqabalah
+* Muqabala
 * Git
 * file inspection
 
@@ -3236,7 +3236,7 @@ The implementation can use:
 ```text
 Git
 RAG
-Muqabalah
+Muqabala
 filesystem
 project detector
 diagnostics
@@ -3563,7 +3563,7 @@ Initially, make it simple:
 ```text
 git diff
 +
-Muqabalah diagnostics
+Muqabala diagnostics
 +
 test result
 ```
@@ -3917,7 +3917,7 @@ Good:
 ```text
 LspDefinitionSkill
         ↓
-MuqabalahClient
+MuqabalaClient
         ↓
 result
 ```
@@ -3955,15 +3955,15 @@ And:
 ```text
 aljabr-core
      ↓
-Muqabalah SPI
+Muqabala SPI
      ↓
-Muqabalah
+Muqabala
 ```
 
 Not:
 
 ```text
-Aljabr → Muqabalah implementation internals
+Aljabr → Muqabala implementation internals
 ```
 
 Likewise:
@@ -4612,7 +4612,7 @@ This gives you a canonical answer to:
 
 # 10. Semantic search tool
 
-Since your existing architecture has Muqabalah/LSP capabilities, Aljabr should expose them as simple coding tools rather than reinventing code intelligence.
+Since your existing architecture has Muqabala/LSP capabilities, Aljabr should expose them as simple coding tools rather than reinventing code intelligence.
 
 ```java
 public record SearchCodeInput(
@@ -4660,7 +4660,7 @@ This keeps Aljabr independent of whether the backend is:
 ripgrep
 LSP
 RAG
-Muqabalah
+Muqabala
 hybrid search
 ```
 
@@ -4668,7 +4668,7 @@ hybrid search
 
 # 11. Symbol tools
 
-You already have the Muqabalah-oriented LSP capabilities, so make the Aljabr surface simple:
+You already have the Muqabala-oriented LSP capabilities, so make the Aljabr surface simple:
 
 ```text
 definition
@@ -4708,7 +4708,7 @@ public interface CodeIntelligence {
 }
 ```
 
-Aljabr doesn't care how Muqabalah implements it.
+Aljabr doesn't care how Muqabala implements it.
 
 ---
 
@@ -5112,7 +5112,7 @@ approval?
      ↓
 CodingTool
      ↓
-Muqabalah / Sandbox / Git / FS
+Muqabala / Sandbox / Git / FS
      ↓
 ToolEvidence
      ↓
@@ -5569,7 +5569,7 @@ At this point I'd consider the core shape settled:
               │              │                 ▼
               │              │       ┌─────────┼─────────┐
               │              │       ▼         ▼         ▼
-              │              │      FS       Git      Muqabalah
+              │              │      FS       Git      Muqabala
               │              │
               └──────────────┼──────────────────────┐
                              ▼                      │
@@ -6930,7 +6930,7 @@ aljabr/
     └── review-report.json
 ```
 
-Then we can write the **actual production-grade contents** of those files—not pseudocode—and simultaneously map each tool to your existing Wayang `Skill`, `AgentTool`, `AgentToolExecutor`, Muqabalah, sandbox, memory, and checkpoint APIs. That would be the next practical step before touching more architecture.
+Then we can write the **actual production-grade contents** of those files—not pseudocode—and simultaneously map each tool to your existing Wayang `Skill`, `AgentTool`, `AgentToolExecutor`, Muqabala, sandbox, memory, and checkpoint APIs. That would be the next practical step before touching more architecture.
 
 
 

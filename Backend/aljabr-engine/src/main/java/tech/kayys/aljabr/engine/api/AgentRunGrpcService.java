@@ -12,10 +12,14 @@ import tech.kayys.wayang.agent.AgentRequest;
 import io.grpc.stub.StreamObserver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.quarkus.grpc.GrpcService;
+import jakarta.inject.Singleton;
+
 import java.util.Map;
 import java.util.function.Consumer;
 
-@ApplicationScoped
+@GrpcService
+@Singleton
 public class AgentRunGrpcService extends AgentRunServiceGrpc.AgentRunServiceImplBase {
 
     @Inject

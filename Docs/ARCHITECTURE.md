@@ -48,7 +48,7 @@ graph TD
     end
 
     subgraph Layer_4_Substrate ["Substrate & Toolchain Adapters"]
-        LspSubstrate["Muqabalah LSP / DAP Kernel (gRPC & WS)"]
+        LspSubstrate["Muqabala LSP / DAP Kernel (gRPC & WS)"]
         WorkspaceIdx["Workspace Indexer & AST Relation Graph"]
         Adapters["Tool Adapters (CMake, SwiftPM, Xcode, Make, Maven, Gradle, Flutter, Sonar)"]
     end

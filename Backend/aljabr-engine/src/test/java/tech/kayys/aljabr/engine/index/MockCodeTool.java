@@ -3,11 +3,11 @@ package tech.kayys.aljabr.engine.index;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import io.quarkus.test.Mock;
-import tech.kayys.muqabalah.api.CodeTool;
-import tech.kayys.muqabalah.document.TextEdit;
-import tech.kayys.muqabalah.language.LanguageTypes.*;
-import tech.kayys.muqabalah.document.Position;
-import tech.kayys.muqabalah.document.Range;
+import tech.kayys.muqabala.api.CodeTool;
+import tech.kayys.muqabala.document.TextEdit;
+import tech.kayys.muqabala.language.LanguageTypes.*;
+import tech.kayys.muqabala.document.Position;
+import tech.kayys.muqabala.document.Range;
 
 import java.net.URI;
 import java.nio.file.Path;
@@ -86,7 +86,7 @@ public class MockCodeTool implements CodeTool {
     }
 
     @Override
-    public Uni<List<CodeAction>> codeActions(String workspaceId, Path file, tech.kayys.muqabalah.document.Range range) {
+    public Uni<List<CodeAction>> codeActions(String workspaceId, Path file, tech.kayys.muqabala.document.Range range) {
         return Uni.createFrom().item(List.of());
     }
 

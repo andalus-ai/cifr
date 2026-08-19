@@ -5,6 +5,8 @@ import jakarta.inject.Inject;
 import tech.kayys.aljabr.engine.skill.SkillContext;
 import tech.kayys.aljabr.engine.skill.SkillDescriptor;
 import tech.kayys.aljabr.engine.skill.SkillRegistry;
+import tech.kayys.aljabr.engine.skill.reasoning.ReasoningDecision;
+import tech.kayys.aljabr.engine.skill.reasoning.ReasoningGate;
 
 import java.util.HashMap;
 import java.util.Map;
