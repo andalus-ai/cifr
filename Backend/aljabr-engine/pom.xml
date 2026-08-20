@@ -23,13 +23,50 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys</groupId>
+            <artifactId>aljabr-indexing</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys</groupId>
+            <artifactId>aljabr-security</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys</groupId>
+            <artifactId>aljabr-standalone</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys</groupId>
+            <artifactId>aljabr-tools-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys</groupId>
+            <artifactId>aljabr-tools-builtin</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys</groupId>
             <artifactId>aljabr-skills-api</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>tech.kayys</groupId>
+            <artifactId>aljabr-skills-builtin</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys</groupId>
             <artifactId>aljabr-toolchain-api</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys</groupId>
+            <artifactId>aljabr-toolchain-adapters</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- SPI Dependencies -->
@@ -86,23 +123,6 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-redis-client</artifactId>
-        </dependency>
-
-        <!-- Lucene dependencies for Search Engine -->
-        <dependency>
-            <groupId>org.apache.lucene</groupId>
-            <artifactId>lucene-core</artifactId>
-            <version>9.11.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.lucene</groupId>
-            <artifactId>lucene-queryparser</artifactId>
-            <version>9.11.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.lucene</groupId>
-            <artifactId>lucene-analysis-common</artifactId>
-            <version>9.11.1</version>
         </dependency>
 
         <!-- Tooling and Serialization -->

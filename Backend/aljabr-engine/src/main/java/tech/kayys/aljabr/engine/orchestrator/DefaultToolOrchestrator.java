@@ -24,6 +24,14 @@ public class DefaultToolOrchestrator implements ToolOrchestrator {
     @Inject
     ExecutionEngine executionEngine;
 
+    public DefaultToolOrchestrator() {}
+
+    public DefaultToolOrchestrator(ProjectDetector projectDetector, ToolResolver resolver, ExecutionEngine executionEngine) {
+        this.projectDetector = projectDetector;
+        this.resolver = resolver;
+        this.executionEngine = executionEngine;
+    }
+
     @Override
     public Uni<ExecutionResult> orchestrate(ToolIntent intent, Path workspaceRoot, ToolOrchestrationPolicy policy) {
         if (intent.kind() == ToolKind.RUN_COMMAND && !policy.allowArbitraryCommands()) {

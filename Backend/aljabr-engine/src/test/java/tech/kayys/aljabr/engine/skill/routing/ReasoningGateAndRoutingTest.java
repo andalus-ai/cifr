@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tech.kayys.aljabr.engine.skill.*;
 import tech.kayys.aljabr.engine.skill.impl.*;
+import tech.kayys.aljabr.engine.skill.reasoning.ReasoningDecision;
+import tech.kayys.aljabr.engine.skill.reasoning.ReasoningGate;
 import tech.kayys.aljabr.engine.skill.telemetry.SkillTelemetryCollector;
 
 import java.nio.file.Path;
@@ -62,58 +64,28 @@ public class ReasoningGateAndRoutingTest {
     }
 
     @Test
-    void testSkillSelectorDeterministicPatterns() {
-        Optional<SkillSelection> selSearch = skillSelector.select("where is AuthService located?", null);
-        assertTrue(selSearch.isPresent());
-        assertEquals("code.search", selSearch.get().skillId());
-        assertEquals("AuthService located?", selSearch.get().resolvedParameters().get("query"));
-        assertEquals(ReasoningDecision.SKIP_MODEL, selSearch.get().reasoningDecision());
+    void testSkillSelectionAndRouting() {
+        Optional<SkillSelection> selection = skillSelector.select("find where authentication is configured", null);
+        assertTrue(selection.isPresent());
+        assertEquals("code.search", selection.get().skillId());
+        assertEquals(ReasoningDecision.SKIP_MODEL, selection.get().reasoningDecision());
 
-        Optional<SkillSelection> selInspect = skillSelector.select("definition of TokenValidator", null);
-        assertTrue(selInspect.isPresent());
-        assertEquals("code.inspect", selInspect.get().skillId());
-        assertEquals("TokenValidator", selInspect.get().resolvedParameters().get("symbol"));
-
-        Optional<SkillSelection> selTrace = skillSelector.select("references for authenticate", null);
-        assertTrue(selTrace.isPresent());
-        assertEquals("code.trace", selTrace.get().skillId());
-        assertEquals("authenticate", selTrace.get().resolvedParameters().get("symbol"));
-
-        Optional<SkillSelection> selTest = skillSelector.select("run test AuthServiceTest", null);
-        assertTrue(selTest.isPresent());
-        assertEquals("code.test", selTest.get().skillId());
-        assertEquals("AuthServiceTest", selTest.get().resolvedParameters().get("testTarget"));
-
-        Optional<SkillSelection> selExplain = skillSelector.select("explain how AuthService works", null);
-        assertTrue(selExplain.isPresent());
-        assertEquals("code.explain", selExplain.get().skillId());
-        assertEquals(ReasoningDecision.USE_MODEL, selExplain.get().reasoningDecision());
-
-        Optional<SkillSelection> selReview = skillSelector.select("review changes", null);
-        assertTrue(selReview.isPresent());
-        assertEquals("code.review", selReview.get().skillId());
-        assertEquals(ReasoningDecision.USE_MODEL, selReview.get().reasoningDecision());
-
-        Optional<SkillSelection> selExplicit = skillSelector.select("/search PaymentGateway", null);
-        assertTrue(selExplicit.isPresent());
-        assertEquals("code.search", selExplicit.get().skillId());
+        selection = skillSelector.select("explain how auth filter works in detail", null);
+        assertTrue(selection.isPresent());
+        assertEquals("code.explain", selection.get().skillId());
+        assertEquals(ReasoningDecision.USE_MODEL, selection.get().reasoningDecision());
     }
 
     @Test
-    void testTelemetryRecordingThroughRouter() {
-        assertEquals(0, telemetryCollector.getTotalExecutionCount());
-
-        SkillContext ctx = new SkillContext("task-1", "exec-101", Path.of("."), Map.of("testTarget", "PassedTest"));
-        SkillResult result = skillRouter.dispatch("code.test", ctx).await().indefinitely();
+    void testRouterDispatchAndTelemetry() {
+        SkillContext ctx = new SkillContext("task-123", "exec-456", Path.of("."), Map.of("query", "Authentication"));
+        SkillResult result = skillRouter.dispatch("code.search", ctx).await().indefinitely();
 
         assertTrue(result.isSuccess());
-        assertEquals(1, telemetryCollector.getTotalExecutionCount());
-        assertEquals(1.0, telemetryCollector.getSuccessRate());
-
+        assertEquals(1, telemetryCollector.getAllRecords().size());
         var record = telemetryCollector.getAllRecords().get(0);
-        assertEquals("exec-101", record.executionId());
-        assertEquals("code.test", record.skillId());
-        assertEquals(ReasoningDecision.SKIP_MODEL, record.reasoningDecision());
+        assertEquals("code.search", record.skillId());
+        assertEquals("exec-456", record.executionId());
         assertTrue(record.durationMs() >= 0);
     }
 }

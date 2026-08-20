@@ -52,8 +52,12 @@
 
     <modules>
         <module>aljabr-core</module>
+        <module>aljabr-tools</module>
         <module>aljabr-skills</module>
         <module>aljabr-toolchains</module>
+        <module>aljabr-indexing</module>
+        <module>aljabr-security</module>
+        <module>aljabr-standalone</module>
         <module>aljabr-engine</module>
         <module>aljabr-api</module>
     </modules>

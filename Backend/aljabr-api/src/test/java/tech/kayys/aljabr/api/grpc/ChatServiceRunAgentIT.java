@@ -28,16 +28,19 @@ public class ChatServiceRunAgentIT {
         AtomicBoolean sawDone = new AtomicBoolean(false);
         AtomicBoolean sawPayloadEvent = new AtomicBoolean(false);
 
-        chatClient.runAgent(req).forEachRemaining(event -> {
-            if (event.getType().equals("DONE")) {
-                sawDone.set(true);
-                latch.countDown();
-            } else {
-                if (event.getPayload() != null && !event.getPayload().isEmpty()) {
-                    sawPayloadEvent.set(true);
+        chatClient.runAgent(req).subscribe().with(
+            event -> {
+                if (event.getType().equals("DONE")) {
+                    sawDone.set(true);
+                    latch.countDown();
+                } else {
+                    if (event.getPayload() != null && !event.getPayload().isEmpty()) {
+                        sawPayloadEvent.set(true);
+                    }
                 }
-            }
-        });
+            },
+            failure -> latch.countDown()
+        );
 
         boolean completed = latch.await(10, TimeUnit.SECONDS);
         assertTrue(completed, "Stream should complete with DONE event");

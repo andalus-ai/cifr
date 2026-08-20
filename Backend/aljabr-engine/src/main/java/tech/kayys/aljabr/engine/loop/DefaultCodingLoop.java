@@ -2,17 +2,15 @@ package tech.kayys.aljabr.engine.loop;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
 import tech.kayys.aljabr.api.agent.AgentEvent;
 import tech.kayys.aljabr.api.agent.AgentPhase;
 import tech.kayys.aljabr.api.agent.AljabrState;
-import tech.kayys.aljabr.api.agent.CodingRequest;
-import tech.kayys.aljabr.engine.gate.CodingExecutionContext;
-import tech.kayys.aljabr.engine.gate.CompletionGate;
-import tech.kayys.aljabr.engine.phase.ObservationContext;
-import tech.kayys.aljabr.engine.phase.Observer;
-import tech.kayys.aljabr.engine.phase.TaskAgent;
-import tech.kayys.aljabr.engine.phase.TaskExecutionContext;
+import tech.kayys.aljabr.engine.event.EventLedger;
+import tech.kayys.aljabr.engine.phase.PhaseHandler;
 import tech.kayys.aljabr.engine.state.AgentStateMachine;
+import tech.kayys.aljabr.engine.state.ExecutionStateStore;
 import tech.kayys.aljabr.engine.state.TransitionResult;
 import tech.kayys.wayang.agent.AgentResponse;
 import tech.kayys.wayang.execution.AgentToolExecutor;
@@ -21,33 +19,21 @@ import tech.kayys.wayang.tool.Tool;
 import java.util.List;
 import java.util.logging.Logger;
 
-import tech.kayys.aljabr.engine.event.EventLedger;
-import tech.kayys.aljabr.engine.gate.CodingExecutionContext;
-
 @ApplicationScoped
 public class DefaultCodingLoop implements CodingLoop {
     private static final Logger log = Logger.getLogger(DefaultCodingLoop.class.getName());
 
-    @jakarta.inject.Inject
+    @Inject
     AgentStateMachine stateMachine;
 
-    @jakarta.inject.Inject
-    Observer observer;
+    @Inject
+    Instance<PhaseHandler> phaseHandlers;
 
-    @jakarta.inject.Inject
-    TaskAgent taskAgent;
-
-    @jakarta.inject.Inject
-    CompletionGate completionGate;
-    
-    @jakarta.inject.Inject
+    @Inject
     EventLedger eventLedger;
 
-    @jakarta.inject.Inject
-    tech.kayys.aljabr.engine.state.ExecutionStateStore stateStore;
-
-    @jakarta.inject.Inject
-    tech.kayys.aljabr.engine.eval.Evaluator evaluator;
+    @Inject
+    ExecutionStateStore stateStore;
 
     @Override
     public Uni<AgentResponse> execute(CodingTask task, AgentToolExecutor executor, List<Tool> tools) {
@@ -137,73 +123,17 @@ public class DefaultCodingLoop implements CodingLoop {
 
     private Uni<AgentEvent> executeCurrentPhase(CodingState state, AgentToolExecutor executor, List<Tool> tools) {
         AgentPhase phase = state.getAljabrState().phase();
-        CodingRequest request = new CodingRequest(state.getTask().sessionId(), state.getTask().intent().name());
 
-        switch (phase) {
-            case INITIALIZING:
-                // Move straight to OBSERVING
-                return Uni.createFrom().item(new AgentEvent.ObservationCompleted());
-                
-            case OBSERVING:
-                return observer.observe(request, new ObservationContext(state))
-                        .map(result -> {
-                            state.setRepository(result.repository() != null ? (tech.kayys.aljabr.engine.repo.RepositorySnapshot) result.repository() : null);
-                            return new AgentEvent.PlanCreated(); // Skip explicit planning for now
-                        });
-                        
-            case PLANNING:
-                state.setPlan(new CodingPlan("plan-1", "Auto-generated plan for " + state.getTask().intent().name(), List.of("Execute request")));
-                return Uni.createFrom().item(new AgentEvent.TaskSucceeded());
-                
-            case EXECUTING:
-                return taskAgent.execute(state.getTask(), new TaskExecutionContext(state, executor, tools))
-                        .map(result -> {
-                            state.setLastTaskResult(result);
-                            return new AgentEvent.VerificationCompleted(); 
-                        });
-                        
-            case VERIFYING:
-                tech.kayys.aljabr.engine.phase.TaskExecutionResult lastResult = state.getLastTaskResult();
-                
-                if (lastResult == null) {
-                    return Uni.createFrom().item(new AgentEvent.TaskFailed());
+        if (phaseHandlers != null) {
+            for (PhaseHandler handler : phaseHandlers) {
+                if (handler.supports(phase)) {
+                    return handler.handle(state, executor, tools);
                 }
-                
-                return completionGate.evaluate(state.getTask(), lastResult, new CodingExecutionContext(state))
-                        .map(decision -> {
-                            if (decision.isComplete()) {
-                                return new AgentEvent.ReviewCompleted();
-                            } else {
-                                if (state.getIteration() >= state.getTask().policy().maxRepairIterations()) {
-                                    return new AgentEvent.TaskFailed(); // Goes to REPLANNING or FAILED depending on state machine
-                                }
-                                state.incrementIteration();
-                                return new AgentEvent.TaskFailed(); // Causes RECOVERING/REPLANNING
-                            }
-                        });
-                        
-            case REVIEWING:
-                return Uni.createFrom().item(new AgentEvent.TaskSucceeded()); // Goes to EVALUATING
-                
-            case EVALUATING:
-                return evaluator.evaluate(state).map(result -> {
-                    log.info("Evaluation Result: " + result.decision() + " - " + result.score());
-                    if (result.decision() == tech.kayys.aljabr.engine.eval.EvaluationDecision.PASS || 
-                        result.decision() == tech.kayys.aljabr.engine.eval.EvaluationDecision.TERMINATE) {
-                        return new AgentEvent.EvaluationCompleted();
-                    } else {
-                        return new AgentEvent.TaskFailed(); // Causes REPLANNING
-                    }
-                });
-                
-            case RECOVERING:
-            case REPLANNING:
-                return Uni.createFrom().item(new AgentEvent.TaskSucceeded()); // Goes back to EXECUTING
-                
-            default:
-                log.warning("Unhandled phase: " + phase);
-                return Uni.createFrom().item(new AgentEvent.TaskFailed());
+            }
         }
+
+        log.warning("Unhandled phase or no PhaseHandler registered for: " + phase);
+        return Uni.createFrom().item(new AgentEvent.TaskFailed());
     }
 
     private AgentResponse finalizeLoop(CodingState state) {
