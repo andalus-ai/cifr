@@ -4,6 +4,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import tech.kayys.aljabr.engine.orchestrator.ResolvedTool;
 import tech.kayys.aljabr.engine.orchestrator.ToolIntent;
+import tech.kayys.aljabr.engine.orchestrator.ToolKind;
 import tech.kayys.aljabr.engine.orchestrator.policy.ExecutionEnvironment;
 import tech.kayys.aljabr.engine.orchestrator.toolchain.BuildSystem;
 import tech.kayys.aljabr.engine.orchestrator.toolchain.ProjectToolchain;
@@ -16,67 +17,44 @@ public class CMakeToolAdapter implements ToolAdapter {
 
     @Override
     public boolean supports(ProjectToolchain toolchain) {
-        return toolchain != null && toolchain.buildSystem() == BuildSystem.CMAKE;
+        return toolchain.buildSystem() == BuildSystem.CMAKE;
     }
 
     @Override
     public Uni<ResolvedTool> resolve(ToolIntent intent, ProjectToolchain toolchain) {
-        return Uni.createFrom().item(() -> {
-            List<String> command = new ArrayList<>();
+        List<String> cmd = new ArrayList<>();
 
-            switch (intent.kind()) {
-                case BUILD -> {
-                    command.add("cmake");
-                    command.add("--build");
-                    command.add("build");
-                }
-                case RUN_TEST -> {
-                    command.add("ctest");
-                    command.add("--test-dir");
-                    command.add("build");
-                    command.add("--output-on-failure");
-                    Object testTarget = intent.arguments().get("test");
-                    if (testTarget != null && !testTarget.toString().isBlank()) {
-                        command.add("-R");
-                        command.add(testTarget.toString());
-                    }
-                }
-                case RUN_TESTS -> {
-                    command.add("ctest");
-                    command.add("--test-dir");
-                    command.add("build");
-                    command.add("--output-on-failure");
-                }
-                case FORMAT -> {
-                    command.add("clang-format");
-                    command.add("-i");
-                    Object file = intent.arguments().get("file");
-                    command.add(file != null ? file.toString() : "src/*.cpp");
-                }
-                case LINT -> {
-                    command.add("clang-tidy");
-                    Object file = intent.arguments().get("file");
-                    if (file != null) {
-                        command.add(file.toString());
-                    } else {
-                        command.add("-p");
-                        command.add("build");
-                    }
-                }
-                default -> {
-                    Object rawCmd = intent.arguments().get("command");
-                    if (rawCmd != null) {
-                        return new ResolvedTool(intent.kind(), List.of(rawCmd.toString().split("\\s+")), toolchain.rootDirectory(), ExecutionEnvironment.defaultSandboxed());
-                    }
-                    command.add("cmake");
-                    command.add("-B");
-                    command.add("build");
-                    command.add("-S");
-                    command.add(".");
-                }
+        if (intent.kind() == ToolKind.RUN_TEST || intent.kind() == ToolKind.RUN_TESTS) {
+            cmd.add("ctest");
+            cmd.add("--test-dir");
+            cmd.add("build");
+            cmd.add("--output-on-failure");
+            if (intent.arguments().containsKey("test")) {
+                cmd.add("-R");
+                cmd.add((String) intent.arguments().get("test"));
             }
+        } else if (intent.kind() == ToolKind.FORMAT) {
+            cmd.add("clang-format");
+            cmd.add("-i");
+            if (intent.arguments().containsKey("file")) {
+                cmd.add((String) intent.arguments().get("file"));
+            }
+        } else if (intent.kind() == ToolKind.LINT || intent.kind() == ToolKind.STATIC_ANALYSIS) {
+            cmd.add("clang-tidy");
+            if (intent.arguments().containsKey("file")) {
+                cmd.add((String) intent.arguments().get("file"));
+            }
+        } else {
+            cmd.add("cmake");
+            cmd.add("--build");
+            cmd.add("build");
+        }
 
-            return new ResolvedTool(intent.kind(), command, toolchain.rootDirectory(), ExecutionEnvironment.defaultSandboxed());
-        });
+        return Uni.createFrom().item(new ResolvedTool(
+            intent.kind(),
+            cmd,
+            toolchain.rootDirectory(),
+            ExecutionEnvironment.defaultSandboxed()
+        ));
     }
 }

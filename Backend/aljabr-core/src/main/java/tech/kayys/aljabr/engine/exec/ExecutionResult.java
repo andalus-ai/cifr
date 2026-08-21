@@ -17,6 +17,10 @@ public record ExecutionResult(
         diagnostics = diagnostics != null ? List.copyOf(diagnostics) : List.of();
     }
 
+    public ExecutionResult(int exitCode, String stdoutSummary, String stderrSummary, boolean timedOut) {
+        this(exitCode, stdoutSummary, stderrSummary, List.of(), Optional.empty(), timedOut);
+    }
+
     public boolean isSuccess() {
         return exitCode == 0 && !timedOut;
     }

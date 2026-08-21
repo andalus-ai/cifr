@@ -4,6 +4,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import tech.kayys.aljabr.engine.orchestrator.ResolvedTool;
 import tech.kayys.aljabr.engine.orchestrator.ToolIntent;
+import tech.kayys.aljabr.engine.orchestrator.ToolKind;
 import tech.kayys.aljabr.engine.orchestrator.policy.ExecutionEnvironment;
 import tech.kayys.aljabr.engine.orchestrator.toolchain.BuildSystem;
 import tech.kayys.aljabr.engine.orchestrator.toolchain.ProjectToolchain;
@@ -16,54 +17,32 @@ public class XcodeToolAdapter implements ToolAdapter {
 
     @Override
     public boolean supports(ProjectToolchain toolchain) {
-        return toolchain != null && toolchain.buildSystem() == BuildSystem.XCODE;
+        return toolchain.buildSystem() == BuildSystem.XCODE;
     }
 
     @Override
     public Uni<ResolvedTool> resolve(ToolIntent intent, ProjectToolchain toolchain) {
-        return Uni.createFrom().item(() -> {
-            List<String> command = new ArrayList<>();
-            command.add("xcodebuild");
+        List<String> cmd = new ArrayList<>();
 
-            Object scheme = intent.arguments().get("scheme");
-            if (scheme != null && !scheme.toString().isBlank()) {
-                command.add("-scheme");
-                command.add(scheme.toString());
+        if (intent.kind() == ToolKind.FORMAT) {
+            cmd.add("clang-format");
+            cmd.add("-i");
+            if (intent.arguments().containsKey("file")) {
+                cmd.add((String) intent.arguments().get("file"));
             }
+        } else if (intent.kind() == ToolKind.RUN_TEST || intent.kind() == ToolKind.RUN_TESTS) {
+            cmd.add("xcodebuild");
+            cmd.add("test");
+        } else {
+            cmd.add("xcodebuild");
+            cmd.add("build");
+        }
 
-            switch (intent.kind()) {
-                case BUILD -> command.add("build");
-                case RUN_TEST, RUN_TESTS -> {
-                    command.add("test");
-                    Object testTarget = intent.arguments().get("test");
-                    if (testTarget != null && !testTarget.toString().isBlank()) {
-                        command.add("-only-testing:" + testTarget);
-                    }
-                }
-                case FORMAT -> {
-                    command.clear();
-                    Object file = intent.arguments().get("file");
-                    String filePath = file != null ? file.toString() : "";
-                    if (filePath.endsWith(".m") || filePath.endsWith(".h") || filePath.endsWith(".mm")) {
-                        command.addAll(List.of("clang-format", "-i", filePath));
-                    } else {
-                        command.addAll(List.of("swift-format", "format", "-i", filePath.isBlank() ? "." : filePath));
-                    }
-                }
-                case LINT -> {
-                    command.clear();
-                    command.add("swiftlint");
-                }
-                default -> {
-                    Object rawCmd = intent.arguments().get("command");
-                    if (rawCmd != null) {
-                        return new ResolvedTool(intent.kind(), List.of(rawCmd.toString().split("\\s+")), toolchain.rootDirectory(), ExecutionEnvironment.defaultSandboxed());
-                    }
-                    command.add("-showsdks");
-                }
-            }
-
-            return new ResolvedTool(intent.kind(), command, toolchain.rootDirectory(), ExecutionEnvironment.defaultSandboxed());
-        });
+        return Uni.createFrom().item(new ResolvedTool(
+            intent.kind(),
+            cmd,
+            toolchain.rootDirectory(),
+            ExecutionEnvironment.defaultSandboxed()
+        ));
     }
 }

@@ -77,7 +77,20 @@ public class DefaultRepositoryQueryService implements RepositoryQueryService {
         }
         List<FileImportance> ranked = new ArrayList<>();
         for (String id : fileIds) {
-            if (taskDescription != null && taskDescription.toLowerCase().contains(id.toLowerCase())) {
+            String fileName = id;
+            int lastSlash = Math.max(id.lastIndexOf('/'), id.lastIndexOf('\\'));
+            if (lastSlash >= 0 && lastSlash < id.length() - 1) {
+                fileName = id.substring(lastSlash + 1);
+            }
+            String baseName = fileName.contains(".") ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+
+            boolean matches = taskDescription != null && (
+                taskDescription.toLowerCase().contains(id.toLowerCase()) ||
+                taskDescription.toLowerCase().contains(fileName.toLowerCase()) ||
+                taskDescription.toLowerCase().contains(baseName.toLowerCase())
+            );
+
+            if (matches) {
                 ranked.add(FileImportance.high(id, ImportanceReason.DIRECTLY_REFERENCED_BY_TASK));
             } else {
                 ranked.add(FileImportance.of(id, 0.5, ImportanceReason.DEPENDENCY_PROXIMITY));

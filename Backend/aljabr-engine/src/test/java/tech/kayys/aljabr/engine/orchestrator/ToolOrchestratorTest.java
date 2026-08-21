@@ -49,7 +49,7 @@ public class ToolOrchestratorTest {
         ));
         toolPolicy = new DefaultToolPolicy();
         outputProcessor = new DefaultOutputProcessor();
-        executionEngine = new DefaultExecutionEngine(outputProcessor);
+        executionEngine = new DefaultExecutionEngine();
 
         orchestrator = new DefaultToolOrchestrator(projectDetector, toolResolver, executionEngine);
     }

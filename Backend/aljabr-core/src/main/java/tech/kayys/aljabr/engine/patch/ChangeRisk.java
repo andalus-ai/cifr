@@ -7,6 +7,9 @@ public record ChangeRisk(
     List<String> reasons
 ) {
     public ChangeRisk {
+        if (level == null) {
+            throw new IllegalArgumentException("risk level must not be null");
+        }
         reasons = reasons != null ? List.copyOf(reasons) : List.of();
     }
 }
