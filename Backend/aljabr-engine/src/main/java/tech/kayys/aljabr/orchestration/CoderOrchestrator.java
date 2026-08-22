@@ -37,7 +37,23 @@ public class CoderOrchestrator {
     jakarta.enterprise.inject.Instance<Tool> availableTools;
 
     @jakarta.inject.Inject
+    jakarta.enterprise.inject.Instance<tech.kayys.aljabr.engine.tool.AljabrTool> aljabrTools;
+
+    @jakarta.inject.Inject
     jakarta.enterprise.inject.Instance<tech.kayys.aljabr.orchestration.strategy.ExecutionStrategy> strategies;
+
+    public List<Tool> getResolvedTools() {
+        List<Tool> list = new java.util.ArrayList<>();
+        if (availableTools != null) {
+            availableTools.forEach(list::add);
+        }
+        if (aljabrTools != null) {
+            for (tech.kayys.aljabr.engine.tool.AljabrTool at : aljabrTools) {
+                list.add(new tech.kayys.aljabr.engine.AljabrToolAdapter(at));
+            }
+        }
+        return list;
+    }
 
     public Uni<AgentResponse> execute(AgentRequest request) {
         CodingIntent intent = mapIntent(request.content());
@@ -57,7 +73,7 @@ public class CoderOrchestrator {
                 tech.kayys.aljabr.engine.loop.OrchestrationStrategy.REACT
         );
 
-        List<Tool> tools = availableTools.stream().collect(Collectors.toList());
+        List<Tool> tools = getResolvedTools();
         return codingLoop.execute(task, toolExecutor, tools);
     }
 
@@ -82,7 +98,7 @@ public class CoderOrchestrator {
         String strategyId = (String) request.parameters().getOrDefault("strategy", "react");
         tech.kayys.aljabr.orchestration.strategy.ExecutionStrategy strategy = getStrategy(strategyId);
 
-        List<Tool> tools = availableTools.stream().collect(Collectors.toList());
+        List<Tool> tools = getResolvedTools();
         return strategy.stream(request, toolExecutor, tools);
     }
 

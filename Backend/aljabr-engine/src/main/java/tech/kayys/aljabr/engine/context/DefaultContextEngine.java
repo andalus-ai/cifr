@@ -1,6 +1,8 @@
 package tech.kayys.aljabr.engine.context;
 
 import io.smallrye.mutiny.Uni;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import tech.kayys.aljabr.engine.index.FileIndex;
 import tech.kayys.aljabr.engine.index.dependency.DependencyIndex;
 import tech.kayys.aljabr.engine.index.relation.RelationIndex;
@@ -25,13 +27,25 @@ import java.util.List;
  * </ul>
  * Each section is passed through the {@link ContextBudgeter} to ensure the total fits the model's token budget.
  */
+@ApplicationScoped
 public class DefaultContextEngine implements ContextEngine {
 
-    private final SymbolIndex symbolIndex;
-    private final FileIndex fileIndex;
-    private final DependencyIndex dependencyIndex;
-    private final RelationIndex relationIndex;
-    private final ContextBudgeter budgeter;
+    @Inject
+    SymbolIndex symbolIndex;
+
+    @Inject
+    FileIndex fileIndex;
+
+    @Inject
+    DependencyIndex dependencyIndex;
+
+    @Inject
+    RelationIndex relationIndex;
+
+    @Inject
+    ContextBudgeter budgeter;
+
+    public DefaultContextEngine() {}
 
     public DefaultContextEngine(SymbolIndex symbolIndex,
                                 FileIndex fileIndex,

@@ -9,11 +9,6 @@ import tech.kayys.wayang.agent.AgentRequest;
 import tech.kayys.aljabr.orchestration.CoderOrchestrator;
 import tech.kayys.aljabr.api.entity.ChatMessageEntity;
 import tech.kayys.aljabr.api.repository.ChatMessageRepository;
-import tech.kayys.aljabr.engine.event.DefaultEventLedger;
-import tech.kayys.aljabr.api.agent.AgentEvent;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.util.UUID;
 import java.util.List;
@@ -25,7 +20,8 @@ import java.time.Instant;
 import java.util.logging.Logger;
 
 @GrpcService
-public class ChatServiceImpl implements ChatService {
+@jakarta.inject.Singleton
+public class ChatServiceImpl extends MutinyChatServiceGrpc.ChatServiceImplBase implements ChatService {
 
     private static final Logger log = Logger.getLogger(ChatServiceImpl.class.getName());
 
@@ -35,12 +31,8 @@ public class ChatServiceImpl implements ChatService {
     @Inject
     ChatMessageRepository messageRepo;
 
-    @Inject
-    DefaultEventLedger eventLedger;
-
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
-
     // In-memory fallback message storage per session
+
     private final Map<String, List<ChatMessageEntity>> memoryMessages = new ConcurrentHashMap<>();
 
     @Override
@@ -81,53 +73,49 @@ public class ChatServiceImpl implements ChatService {
             : "general-session";
         log.info("Received runAgent request for session: " + targetSession);
 
-        AgentRequest agentReq = AgentRequest.builder()
+        AgentRequest.AgentRequestBuilder agentReqBuilder = AgentRequest.builder()
                 .sessionId(targetSession)
-                .content(request.getPrompt() != null ? request.getPrompt() : "")
-                .build();
+                .content(request.getPrompt() != null ? request.getPrompt() : "");
 
-        // Stream of plain text responses from orchestrator
-        Multi<RunAgentEvent> textStream = orchestrator != null 
+        if (request.getModelId() != null && !request.getModelId().isBlank()) {
+            agentReqBuilder.parameter("model", request.getModelId());
+        }
+        if (request.getProviderId() != null && !request.getProviderId().isBlank()) {
+            agentReqBuilder.parameter("provider", request.getProviderId());
+        }
+        // Pass the workspace path from the selected project so agent tools operate in the correct directory
+        if (request.getWorkspacePath() != null && !request.getWorkspacePath().isBlank()) {
+            agentReqBuilder.parameter("workspace_path", request.getWorkspacePath());
+            log.info("Workspace path set from request: " + request.getWorkspacePath());
+        }
+
+        AgentRequest agentReq = agentReqBuilder.build();
+
+        // Emit streaming tokens from orchestrator, then a DONE sentinel
+        Multi<RunAgentEvent> textStream = orchestrator != null
                 ? orchestrator.stream(agentReq)
                     .map(response -> {
                         String text = response != null && response.content() != null ? response.content() : "";
+                        String type = response != null && response.type() != null ? response.type() : "TEXT";
                         return RunAgentEvent.newBuilder()
-                                .setType("TEXT")
+                                .setType(type)
                                 .setContent(text)
                                 .build();
                     })
+                    .onFailure().recoverWithItem(err ->
+                            RunAgentEvent.newBuilder()
+                                    .setType("ERROR")
+                                    .setContent("Agent error: " + err.getMessage())
+                                    .build())
                 : Multi.createFrom().item(RunAgentEvent.newBuilder()
                     .setType("TEXT")
                     .setContent("Aljabr Agent Ready: Workspace verified.")
                     .build());
 
-        // Stream of recorded AgentEvent from the EventLedger
-        Multi<RunAgentEvent> ledgerStream = Multi.createFrom().emitter(emitter -> {
-            java.util.function.Consumer<AgentEvent> listener = ev -> {
-                try {
-                    java.util.Map data = mapper.convertValue(ev, java.util.Map.class);
-                    data.put("eventType", ev.getClass().getSimpleName());
-                    String payload = mapper.writeValueAsString(data);
-                    RunAgentEvent evMsg = RunAgentEvent.newBuilder()
-                            .setType(ev.getClass().getSimpleName())
-                            .setPayload(payload)
-                            .build();
-                    emitter.emit(evMsg);
-                } catch (Exception ex) {
-                    // ignore
-                }
-            };
-            if (eventLedger != null) {
-                eventLedger.registerListener(listener);
-                emitter.onTermination(() -> eventLedger.unregisterListener(listener));
-            } else {
-                emitter.complete();
-            }
-        });
-
-        // Merge both streams; ensure a DONE event when orchestrator completes
-        return Multi.createBy().merging().streams(textStream, ledgerStream)
-                .onCompletion().continueWith(RunAgentEvent.newBuilder().setType("DONE").setContent("Completed").build());
+        // Drive the stream from textStream only; append DONE when it finishes
+        return textStream
+                .onCompletion().continueWith(
+                        RunAgentEvent.newBuilder().setType("DONE").setContent("Completed").build());
     }
 
     private ChatMessage toChatMessageProto(ChatMessageEntity m) {

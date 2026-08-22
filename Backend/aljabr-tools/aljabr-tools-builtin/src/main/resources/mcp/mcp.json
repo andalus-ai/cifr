@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "flutter": {
+      "command": "flutter",
+      "args": ["mcp-server"],
+      "enabled": true
+    },
+    "git": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "enabled": false
+    }
+  }
+}

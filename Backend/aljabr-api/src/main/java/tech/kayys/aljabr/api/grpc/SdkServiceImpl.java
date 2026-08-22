@@ -5,7 +5,8 @@ import io.smallrye.mutiny.Uni;
 import tech.kayys.wayang.pro.api.grpc.*;
 
 @GrpcService
-public class SdkServiceImpl implements SdkService {
+@jakarta.inject.Singleton
+public class SdkServiceImpl extends MutinySdkServiceGrpc.SdkServiceImplBase implements SdkService {
 
     @Override
     public Uni<ListProvidersResponse> listProviders(Empty request) {

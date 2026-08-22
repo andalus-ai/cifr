@@ -47,8 +47,9 @@ public class ReadFileTool implements AljabrTool {
                     return new ReadFileResult("", 0, 0, List.of(), new FileMetadata(0L, 0L, true));
                 }
 
-                Path absPath = WORKSPACE_ROOT.resolve(pathStr).normalize();
-                if (!absPath.startsWith(WORKSPACE_ROOT) || !Files.exists(absPath) || Files.isDirectory(absPath)) {
+                Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot();
+                Path absPath = workspaceRoot.resolve(pathStr).normalize();
+                if (!Files.exists(absPath) || Files.isDirectory(absPath)) {
                     return new ReadFileResult(pathStr, 0, 0, List.of(), new FileMetadata(0L, 0L, true));
                 }
 

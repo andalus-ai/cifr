@@ -263,3 +263,62 @@ service SdkService {
   rpc ListProviders (Empty) returns (ListProvidersResponse);
   rpc ListModels (ListModelsRequest) returns (ListModelsResponse);
 }
+
+// --- MCP Management Service ---
+
+message McpServerInfo {
+  string id = 1;
+  string url = 2;
+  string command = 3;
+  repeated string args = 4;
+  string transport = 5;
+  bool enabled = 6;
+}
+
+message ListMcpServersResponse {
+  repeated McpServerInfo servers = 1;
+}
+
+message RegisterMcpServerRequest {
+  string id = 1;
+  string url = 2;
+  string command = 3;
+  repeated string args = 4;
+  string transport = 5;
+  bool enabled = 6;
+}
+
+message RemoveMcpServerRequest {
+  string id = 1;
+}
+
+message RemoveMcpServerResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ReloadMcpResponse {
+  bool success = 1;
+  int32 server_count = 2;
+  int32 tool_count = 3;
+}
+
+message McpToolInfo {
+  string server_id = 1;
+  string name = 2;
+  string description = 3;
+  string input_schema_json = 4;
+}
+
+message ListMcpToolsResponse {
+  repeated McpToolInfo tools = 1;
+}
+
+service McpService {
+  rpc ListServers (Empty) returns (ListMcpServersResponse);
+  rpc RegisterServer (RegisterMcpServerRequest) returns (McpServerInfo);
+  rpc RemoveServer (RemoveMcpServerRequest) returns (RemoveMcpServerResponse);
+  rpc Reload (Empty) returns (ReloadMcpResponse);
+  rpc ListTools (Empty) returns (ListMcpToolsResponse);
+}
+

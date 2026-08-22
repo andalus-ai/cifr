@@ -13,7 +13,7 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class DirectoryListTool implements AljabrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
+
     private static final int DEFAULT_MAX_DEPTH = 1;
     private static final int MAX_ENTRIES = 500;
 
@@ -43,6 +43,7 @@ public class DirectoryListTool implements AljabrTool {
     public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
         return Uni.createFrom().item(() -> {
             try {
+                Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot();
                 String pathStr = (String) request.arguments().getOrDefault("path", ".");
                 String pattern = (String) request.arguments().getOrDefault("pattern", "*");
                 boolean recursive = Boolean.TRUE.equals(request.arguments().get("recursive"));
@@ -50,8 +51,8 @@ public class DirectoryListTool implements AljabrTool {
                     recursive ? 10 : DEFAULT_MAX_DEPTH)).intValue();
                 boolean showHidden = Boolean.TRUE.equals(request.arguments().get("showHidden"));
 
-                Path dir = WORKSPACE_ROOT.resolve(pathStr).normalize();
-                if (!dir.startsWith(WORKSPACE_ROOT) || !Files.isDirectory(dir))
+                Path dir = workspaceRoot.resolve(pathStr).normalize();
+                if (!Files.isDirectory(dir))
                     return new DirectoryListResult(pathStr, List.of(), false);
 
                 PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);

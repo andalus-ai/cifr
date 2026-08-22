@@ -36,7 +36,21 @@ public class GitStatusTool extends AbstractGitTool {
                 builder.directory(workspace.toFile());
                 Process process = builder.start();
                 String output = new String(process.getInputStream().readAllBytes());
-                process.waitFor();
+                String error = new String(process.getErrorStream().readAllBytes());
+                int exitCode = process.waitFor();
+
+                if (exitCode != 0) {
+                    final String msg = !error.isBlank() ? error.trim() : "Git exited with code " + exitCode;
+                    class ErrorToolResult extends BaseResource implements ToolResult {
+                        public ErrorToolResult(Id id) {
+                            super(new ResourceId.CustomId(id, new ResourceType.Custom("error")), Metadata.empty());
+                        }
+                        @Override public Map<String, Object> getOutputs() { return Map.of("error", msg); }
+                        @Override public boolean isSuccess() { return false; }
+                        @Override public String getErrorMessage() { return msg; }
+                    }
+                    return new ErrorToolResult(Id.random());
+                }
                 
                 class StatusToolResult extends BaseResource implements ToolResult {
                     public StatusToolResult(Id id) {
@@ -52,7 +66,7 @@ public class GitStatusTool extends AbstractGitTool {
                     public ErrorToolResult(Id id) {
                         super(new ResourceId.CustomId(id, new ResourceType.Custom("error")), Metadata.empty());
                     }
-                    @Override public Map<String, Object> getOutputs() { return Map.of(); }
+                    @Override public Map<String, Object> getOutputs() { return Map.of("error", e.getMessage()); }
                     @Override public boolean isSuccess() { return false; }
                     @Override public String getErrorMessage() { return e.getMessage(); }
                 }

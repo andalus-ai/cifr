@@ -20,7 +20,8 @@ import java.util.stream.Collectors;
 import java.util.logging.Logger;
 
 @GrpcService
-public class ProjectServiceImpl implements ProjectService {
+@jakarta.inject.Singleton
+public class ProjectServiceImpl extends MutinyProjectServiceGrpc.ProjectServiceImplBase implements ProjectService {
 
     private static final Logger log = Logger.getLogger(ProjectServiceImpl.class.getName());
 
@@ -41,13 +42,20 @@ public class ProjectServiceImpl implements ProjectService {
     private final Map<String, SessionEntity> memorySessions = new ConcurrentHashMap<>();
 
     public ProjectServiceImpl() {
-        // Pre-seed default local workspace
-        String userDir = System.getProperty("user.dir");
+        // Pre-seed default local workspace using WORKSPACE_ROOT env or user.dir
+        String workspaceRoot = System.getenv("WORKSPACE_ROOT");
+        if (workspaceRoot == null || workspaceRoot.isBlank()) {
+            workspaceRoot = System.getProperty("workspace.root");
+        }
+        if (workspaceRoot == null || workspaceRoot.isBlank()) {
+            workspaceRoot = System.getProperty("user.dir");
+        }
+
         ProjectEntity defaultProject = new ProjectEntity();
         defaultProject.id = "local-workspace";
         defaultProject.name = "Aljabr Workspace";
         defaultProject.description = "Primary Local Workspace";
-        defaultProject.basePath = userDir != null ? userDir : "/tmp";
+        defaultProject.basePath = workspaceRoot != null ? workspaceRoot : "/tmp";
         defaultProject.archived = false;
         memoryProjects.put(defaultProject.id, defaultProject);
 

@@ -1,5 +1,7 @@
 package tech.kayys.aljabr.engine.context;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 /**
  * Default implementation of {@link ContextBudgeter}.
  *
@@ -7,6 +9,7 @@ package tech.kayys.aljabr.engine.context;
  * token count would exceed {@code tokenBudget}.  A sentinel suffix is appended so downstream
  * consumers know truncation occurred.
  */
+@ApplicationScoped
 public class DefaultContextBudgeter implements ContextBudgeter {
 
     private static final String TRUNCATION_MARKER = "\n[truncated to fit token budget]";
