@@ -1,0 +1,47 @@
+package tech.kayys.aljabr.engine.tool;
+
+import java.nio.file.Path;
+import java.util.Optional;
+import tech.kayys.aljabr.engine.loop.CodingPolicy;
+
+/**
+ * Execution context threaded through every tool invocation.
+ * <p>
+ * {@code workspaceRoot} is the resolved filesystem path for the active workspace.
+ * Tools that need to write files or spawn processes can use it directly, instead of
+ * relying on the {@link WorkspaceResolver} ThreadLocal fallback.
+ * </p>
+ */
+public record ToolExecutionContext(
+    String taskId,
+    String workspaceId,
+    CodingPolicy policy,
+    Optional<String> checkpoint,
+    Runnable cancellation,
+    Optional<Path> workspaceRoot
+) {
+    /** Convenience factory without workspaceRoot. */
+    public static ToolExecutionContext of(
+            String taskId,
+            String workspaceId,
+            CodingPolicy policy,
+            Optional<String> checkpoint,
+            Runnable cancellation) {
+        return new ToolExecutionContext(
+                taskId, workspaceId, policy, checkpoint, cancellation, Optional.empty());
+    }
+
+    /** Convenience factory with explicit workspaceRoot. */
+    public static ToolExecutionContext of(
+            String taskId,
+            String workspaceId,
+            CodingPolicy policy,
+            Optional<String> checkpoint,
+            Runnable cancellation,
+            Path workspaceRoot) {
+        return new ToolExecutionContext(
+                taskId, workspaceId, policy, checkpoint, cancellation,
+                Optional.ofNullable(workspaceRoot));
+    }
+}
+

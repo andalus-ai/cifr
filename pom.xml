@@ -5,10 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>tech.kayys.wayang</groupId>
-        <artifactId>wayang-agentic-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
-        <relativePath>../../Families/wayang/pom.xml</relativePath>
+        <groupId>tech.kayys.andalus</groupId>
+        <artifactId>andalus-parent</artifactId>
+        <version>0.0.1</version>
+        <relativePath>../../../../../Families/Andalus/Community/andalus/pom.xml</relativePath>
     </parent>
 
     <groupId>tech.kayys</groupId>
@@ -24,6 +24,7 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <quarkus.platform.version>3.32.2</quarkus.platform.version>
+        <andalus.version>0.0.1</andalus.version>
     </properties>
 
     <dependencyManagement>

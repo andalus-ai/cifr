@@ -71,32 +71,37 @@
 
         <!-- SPI Dependencies -->
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-runtime-spi</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-spi</artifactId>
+            <version>${andalus.version}</version>
         </dependency>
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-tool-spi</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-runtime-spi</artifactId>
+            <version>${andalus.version}</version>
         </dependency>
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-core</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-tool-spi</artifactId>
+            <version>${andalus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-core</artifactId>
+            <version>${andalus.version}</version>
         </dependency>
 
         <!-- Provider SPI — InferenceProvider interface and value types -->
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-provider</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-provider</artifactId>
+            <version>${andalus.version}</version>
         </dependency>
 
         <!-- Provider Plugins — discovered at runtime via CDI @Any Instance<InferenceProvider>. -->
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>wayang-plugin-gemini</artifactId>
+            <artifactId>andalus-plugin-gemini</artifactId>
             <version>0.1.0-SNAPSHOT</version>
             <scope>runtime</scope>
             <exclusions>
@@ -112,7 +117,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>wayang-plugin-openai</artifactId>
+            <artifactId>andalus-plugin-openai</artifactId>
             <version>0.1.0-SNAPSHOT</version>
             <scope>runtime</scope>
             <exclusions>
@@ -128,7 +133,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>wayang-plugin-anthropic</artifactId>
+            <artifactId>andalus-plugin-anthropic</artifactId>
             <version>0.1.0-SNAPSHOT</version>
             <scope>runtime</scope>
             <exclusions>
@@ -144,7 +149,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>wayang-plugin-mistral</artifactId>
+            <artifactId>andalus-plugin-mistral</artifactId>
             <version>0.1.0-SNAPSHOT</version>
             <scope>runtime</scope>
             <exclusions>
@@ -160,7 +165,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.gollek</groupId>
-            <artifactId>wayang-plugin-cerebras</artifactId>
+            <artifactId>andalus-plugin-cerebras</artifactId>
             <version>0.1.0-SNAPSHOT</version>
             <scope>runtime</scope>
             <exclusions>
@@ -175,8 +180,8 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-plugin-gollek</artifactId>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-plugin-gollek</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <scope>runtime</scope>
             <exclusions>
@@ -193,7 +198,7 @@
 
         <!-- Core Agent -->
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
+            <groupId>tech.kayys.andalus</groupId>
             <artifactId>agent-core</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <exclusions>
@@ -205,7 +210,7 @@
         </dependency>
 
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
+            <groupId>tech.kayys.andalus</groupId>
             <artifactId>rag-core</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <exclusions>
@@ -216,8 +221,8 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-tool-mcp</artifactId>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-tool-mcp</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <exclusions>
                 <exclusion>
@@ -227,8 +232,8 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-gollek-sdk</artifactId>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-gollek-sdk</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <exclusions>
                 <exclusion>
@@ -258,8 +263,8 @@
         </dependency>
 
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-tool-os</artifactId>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-tool-os</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <exclusions>
                 <exclusion>
@@ -270,8 +275,8 @@
         </dependency>
 
         <dependency>
-            <groupId>tech.kayys.wayang</groupId>
-            <artifactId>wayang-tools</artifactId>
+            <groupId>tech.kayys.andalus</groupId>
+            <artifactId>andalus-tools</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <exclusions>
                 <exclusion>
@@ -328,7 +333,7 @@
 
         
         <!-- Sandbox SPI -->
-        <!-- docker-java has been extracted to wayang-sandbox-docker -->
+        <!-- docker-java has been extracted to andalus-sandbox-docker -->
 
         <!-- Muqabala LSP Library -->
         <dependency>
