@@ -80,6 +80,15 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
             AtomicInteger depsCount = new AtomicInteger(0);
 
             if (!Files.exists(root)) {
+                if (fileIndex != null) {
+                    for (Path removed : fileIndex.removeMissingFiles(effectiveWorkspaceId, Set.of())) {
+                        if (symbolIndex != null) symbolIndex.removeFile(removed, effectiveWorkspaceId);
+                        if (dependencyIndex != null) dependencyIndex.removeFile(removed.toString(), effectiveWorkspaceId);
+                    }
+                }
+                if (symbolIndex != null) {
+                    symbolIndex.invalidateResolverCache(effectiveWorkspaceId);
+                }
                 return new IndexResult(0, 0, 0, new WorkspaceFingerprint("empty", "1.0", "empty"), 0);
             }
 
