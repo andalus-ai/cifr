@@ -83,8 +83,13 @@ public class DefaultFileIndex implements FileIndex {
     @Override
     public void removeFile(Path file, String workspaceId) {
         if (file == null || workspaceId == null || workspaceId.isBlank()) return;
-        String key = workspaceId + "|" + file.normalize();
-        fileRecords.remove(key);
+        Path normalized = file.normalize();
+        fileRecords.entrySet().removeIf(entry -> {
+            FileRecord record = entry.getValue();
+            if (!workspaceId.equals(record.workspaceId()) || record.path() == null) return false;
+            Path indexed = record.path().normalize();
+            return indexed.equals(normalized) || indexed.endsWith(normalized) || normalized.endsWith(indexed);
+        });
     }
 
     @Override
