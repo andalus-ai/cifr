@@ -1,0 +1,16 @@
+package tech.kayys.cifr.engine.action;
+
+/**
+ * Generic action types supported by the Andalus runtime.
+ */
+public enum ActionType {
+    READ,
+    SEARCH,
+    COMPUTE,
+    TRANSFORM,
+    MODIFY,
+    DELETE,
+    CREATE,
+    INVOKE,
+    EXTERNAL_SIDE_EFFECT
+}

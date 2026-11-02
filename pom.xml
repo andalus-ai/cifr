@@ -12,12 +12,12 @@
     </parent>
 
     <groupId>tech.kayys</groupId>
-    <artifactId>aljabr-parent</artifactId>
+    <artifactId>cifr-parent</artifactId>
     <version>0.1.0</version>
     <packaging>pom</packaging>
 
-    <name>Aljabr - Parent</name>
-    <description>Aljabr Autonomous Coding Agent Subsystem</description>
+    <name>Cifr - Parent</name>
+    <description>Cifr Autonomous Coding Agent Subsystem</description>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -52,15 +52,15 @@
     </build>
 
     <modules>
-        <module>aljabr-core</module>
-        <module>aljabr-tools</module>
-        <module>aljabr-skills</module>
-        <module>aljabr-toolchains</module>
-        <module>aljabr-indexing</module>
-        <module>aljabr-security</module>
-        <module>aljabr-standalone</module>
-        <module>aljabr-engine</module>
-        <module>aljabr-api</module>
+        <module>cifr-core</module>
+        <module>cifr-tools</module>
+        <module>cifr-skills</module>
+        <module>cifr-toolchains</module>
+        <module>cifr-indexing</module>
+        <module>cifr-security</module>
+        <module>cifr-standalone</module>
+        <module>cifr-engine</module>
+        <module>cifr-api</module>
     </modules>
 
 </project>

@@ -1,0 +1,18 @@
+package tech.kayys.cifr.engine.task.event;
+
+public enum TaskEventType {
+    TASK_CREATED,
+    PHASE_CHANGED,
+    CONTEXT_ACQUIRED,
+    PLAN_CREATED,
+    TOOL_STARTED,
+    TOOL_COMPLETED,
+    PATCH_APPLIED,
+    PATCH_ROLLED_BACK,
+    TEST_STARTED,
+    TEST_COMPLETED,
+    CHECKPOINT_CREATED,
+    TASK_COMPLETED,
+    HYPOTHESIS_CREATED,
+    CHANGE_PLANNED
+}

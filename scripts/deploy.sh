@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Aljabr Deployment Utility
+# Cifr Deployment Utility
 # Facilitates multi-module Maven project versioning, git tagging, and artifact deployment.
 
 set -e
@@ -104,7 +104,7 @@ fi
 
 usage() {
     echo -e "${BLUE}--------------------------------------------------${NC}"
-    echo -e "${GREEN} Aljabr Deployment Utility ${NC}"
+    echo -e "${GREEN} Cifr Deployment Utility ${NC}"
     echo -e "${BLUE}--------------------------------------------------${NC}"
     echo ""
     echo "Usage: $0 [options]"
@@ -161,7 +161,7 @@ done
 cd "$PROJECT_ROOT"
 
 echo -e "${BLUE}--------------------------------------------------${NC}"
-echo -e "${GREEN} Aljabr Deployment Utility ${NC}"
+echo -e "${GREEN} Cifr Deployment Utility ${NC}"
 echo -e "${BLUE}--------------------------------------------------${NC}"
 echo ""
 
@@ -202,9 +202,9 @@ if [ -n "$NEW_VERSION" ]; then
     if [ -f "build.gradle.kts" ]; then
         echo -e "${BLUE}>>> Updating Gradle configurations...${NC}"
         if [ "$DRY_RUN" = true ]; then
-            echo -e "${YELLOW}[DRY-RUN]${NC} sed -i.bak -e \"s/extra\\[\\\"aljabrVersion\\\"\\] = \\\".*\\\"/extra\\[\\\"aljabrVersion\\\"\\] = \\\"$NEW_VERSION\\\"/\" build.gradle.kts"
+            echo -e "${YELLOW}[DRY-RUN]${NC} sed -i.bak -e \"s/extra\\[\\\"cifrVersion\\\"\\] = \\\".*\\\"/extra\\[\\\"cifrVersion\\\"\\] = \\\"$NEW_VERSION\\\"/\" build.gradle.kts"
         else
-            sed -i.bak -e "s/extra\[\"aljabrVersion\"\] = \".*\"/extra\[\"aljabrVersion\"\] = \"$NEW_VERSION\"/" build.gradle.kts
+            sed -i.bak -e "s/extra\[\"cifrVersion\"\] = \".*\"/extra\[\"cifrVersion\"\] = \"$NEW_VERSION\"/" build.gradle.kts
             rm -f build.gradle.kts.bak
         fi
     fi
@@ -304,8 +304,8 @@ if [ "$RUN_BUILD" = true ]; then
         if [[ -z "$GITHUB_REPOSITORY" ]] && [[ -z "$REPO_URL" ]]; then
             echo -e "${RED}Error: --github requested but GITHUB_REPOSITORY not set and no --repo provided.${NC}"
             echo -e "${YELLOW}Fix options:${NC}"
-            echo -e "  1. Set the env var:  export GITHUB_REPOSITORY=bhangun/andalus-aljabr"
-            echo -e "  2. Pass explicitly:  $0 --github --repo https://maven.pkg.github.com/bhangun/andalus-aljabr"
+            echo -e "  1. Set the env var:  export GITHUB_REPOSITORY=bhangun/andalus-cifr"
+            echo -e "  2. Pass explicitly:  $0 --github --repo https://maven.pkg.github.com/bhangun/andalus-cifr"
             echo -e "  3. Auto-detect:      Ensure git remote origin uses github.com (SSH or HTTPS)"
             echo -e ""
             echo -e "${BLUE}  Current remote.origin.url:${NC} $(git config --get remote.origin.url 2>/dev/null || echo 'not set')"

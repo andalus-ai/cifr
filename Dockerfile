@@ -14,10 +14,10 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 # Copy the Quarkus fast-jar and its dependencies
-COPY --from=builder /app/aljabr-api/target/quarkus-app/lib/ /app/lib/
-COPY --from=builder /app/aljabr-api/target/quarkus-app/*.jar /app/
-COPY --from=builder /app/aljabr-api/target/quarkus-app/app/ /app/app/
-COPY --from=builder /app/aljabr-api/target/quarkus-app/quarkus/ /app/quarkus/
+COPY --from=builder /app/cifr-api/target/quarkus-app/lib/ /app/lib/
+COPY --from=builder /app/cifr-api/target/quarkus-app/*.jar /app/
+COPY --from=builder /app/cifr-api/target/quarkus-app/app/ /app/app/
+COPY --from=builder /app/cifr-api/target/quarkus-app/quarkus/ /app/quarkus/
 
 EXPOSE 8086
 EXPOSE 9000
