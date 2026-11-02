@@ -149,7 +149,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
 
             // Extract symbols if source code
             if ("java".equals(lang) || "dart".equals(lang) || "typescript".equals(lang) || "python".equals(lang)) {
-                extractSymbols(relative, content, symbolsCount);
+                extractSymbols(relative, content, workspaceId, symbolsCount);
                 extractDependencies(relative, content, depsCount);
             }
 
@@ -158,7 +158,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         }
     }
 
-    private void extractSymbols(Path relative, String content, AtomicInteger symbolsCount) {
+    private void extractSymbols(Path relative, String content, String workspaceId, AtomicInteger symbolsCount) {
         String[] lines = content.split("\n");
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
@@ -171,7 +171,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
                 String typeName = typeMatcher.group(1);
                 SymbolId id = new SymbolId(typeName, "type", relative.toString());
                 SourceRange range = new SourceRange(i + 1, i + 1, 0, line.length());
-                SymbolInfo info = new SymbolInfo(id, typeName, SymbolKind.CLASS, relative, range, Optional.empty());
+                SymbolInfo info = new SymbolInfo(id, typeName, SymbolKind.CLASS, relative, range, Optional.empty(), workspaceId);
 
                 if (symbolIndex != null) {
                     symbolIndex.registerSymbol(info);
@@ -185,7 +185,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
                 if (!methodName.equals("if") && !methodName.equals("for") && !methodName.equals("while") && !methodName.equals("switch")) {
                     SymbolId id = new SymbolId(methodName, "method", relative.toString());
                     SourceRange range = new SourceRange(i + 1, i + 1, 0, line.length());
-                    SymbolInfo info = new SymbolInfo(id, methodName, SymbolKind.METHOD, relative, range, Optional.empty());
+                    SymbolInfo info = new SymbolInfo(id, methodName, SymbolKind.METHOD, relative, range, Optional.empty(), workspaceId);
 
                     if (symbolIndex != null) {
                         symbolIndex.registerSymbol(info);
