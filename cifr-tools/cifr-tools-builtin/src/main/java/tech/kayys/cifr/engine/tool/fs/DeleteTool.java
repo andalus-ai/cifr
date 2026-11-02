@@ -11,9 +11,6 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class DeleteTool implements CifrTool {
-
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -50,7 +47,7 @@ public class DeleteTool implements CifrTool {
             List<String> errors = new ArrayList<>();
 
             for (String pathStr : pathStrs) {
-                Path abs = WORKSPACE_ROOT.resolve(pathStr).normalize();
+                Path abs = context.resolveWorkspacePath(pathStr);
                 if (!abs.startsWith(WORKSPACE_ROOT)) { errors.add("Denied: " + pathStr); continue; }
                 if (!Files.exists(abs)) {
                     if (!force) errors.add("Not found: " + pathStr);
