@@ -25,6 +25,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 /**
  * Adapts an CifrTool into a tech.kayys.andalus.tool.Tool SPI instance.
@@ -33,7 +38,8 @@ public class CifrToolAdapter extends BaseResource implements Tool {
 
     private final CifrTool delegate;
     private final ObjectMapper mapper = new ObjectMapper();
-    private final String workspacePath;
+    private final Path workspaceRoot;
+    private final String workspaceId;
 
     public CifrToolAdapter(CifrTool delegate, String workspacePath) {
         super(new ResourceId.ToolId(Id.random()), 
@@ -42,7 +48,8 @@ public class CifrToolAdapter extends BaseResource implements Tool {
                       .description(delegate.descriptor() != null ? delegate.descriptor().description() : "")
                       .build());
         this.delegate = delegate;
-        this.workspacePath = workspacePath;
+        this.workspaceRoot = Paths.get(workspacePath).toAbsolutePath().normalize();
+        this.workspaceId = stableWorkspaceId(this.workspaceRoot);
     }
 
     public CifrTool getDelegate() {
@@ -80,13 +87,12 @@ public class CifrToolAdapter extends BaseResource implements Tool {
         ToolRequest req = new ToolRequest(invocation != null ? invocation.name() : "", args, Optional.empty(), Collections.emptyList());
         ToolExecutionContext execCtx = new ToolExecutionContext(
                 "task-" + System.currentTimeMillis(),
-                "workspace-default",
+                workspaceId,
                 CodingPolicy.defaultPolicy(),
                 Optional.empty(),
-                () -> {}
+                () -> {},
+                workspaceRoot
         );
-
-        tech.kayys.cifr.engine.tool.WorkspaceResolver.setSessionWorkspace(workspacePath);
 
         return delegate.execute(req, execCtx)
                 .map(res -> {
@@ -127,7 +133,16 @@ public class CifrToolAdapter extends BaseResource implements Tool {
                     }
                     return (ToolResult) new OutputToolResult(Id.random());
                 })
-                .onTermination().invoke(() -> tech.kayys.cifr.engine.tool.WorkspaceResolver.clearSessionWorkspace())
                 .subscribeAsCompletionStage();
     }
+    private static String stableWorkspaceId(Path root) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(root.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return "ws-" + HexFormat.of().formatHex(digest, 0, 12);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
+    }
+
 }
