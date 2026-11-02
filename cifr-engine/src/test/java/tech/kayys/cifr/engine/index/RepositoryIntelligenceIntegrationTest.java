@@ -41,6 +41,9 @@ public class RepositoryIntelligenceIntegrationTest {
         symbolIndex.registerSymbol(new SymbolInfo(
                 target, "mockMethod", SymbolKind.METHOD, Path.of("MockClass.java"),
                 new SourceRange(10, 10, 0, 20), Optional.empty()));
+        symbolIndex.registerSymbol(new SymbolInfo(
+                target, "mockMethod", SymbolKind.METHOD, Path.of("MockClass.java"),
+                new SourceRange(30, 30, 0, 20), Optional.empty(), "other-workspace"));
 
         repositoryIntelligence.fileIndex = fileIndex;
         repositoryIntelligence.symbolIndex = symbolIndex;
@@ -60,6 +63,19 @@ public class RepositoryIntelligenceIntegrationTest {
         assertNotNull(info);
         assertEquals("mockMethod", info.name());
         assertEquals("default-workspace", info.workspaceId());
+    }
+
+    @Test
+    public void testWorkspaceAwareSymbolLookup() {
+        SymbolInfo defaultWorkspace = repositoryIntelligence.symbol(target, "default-workspace")
+                .await().indefinitely();
+        SymbolInfo otherWorkspace = repositoryIntelligence.symbol(target, "other-workspace")
+                .await().indefinitely();
+
+        assertNotNull(defaultWorkspace);
+        assertNotNull(otherWorkspace);
+        assertEquals(10, defaultWorkspace.range().startLine());
+        assertEquals(30, otherWorkspace.range().startLine());
     }
 
     @Test
