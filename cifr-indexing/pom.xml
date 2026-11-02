@@ -21,7 +21,13 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Muqabala LSP Library -->
+        <dependency>
+            <groupId>tech.kayys</groupId>
+            <artifactId>cifr-ide-client</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Muqabala remains temporarily for consumers not migrated in this PR. -->
         <dependency>
             <groupId>tech.kayys.muqabala</groupId>
             <artifactId>muqabala</artifactId>
