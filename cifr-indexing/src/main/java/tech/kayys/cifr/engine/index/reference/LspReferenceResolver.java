@@ -21,20 +21,17 @@ public class LspReferenceResolver implements ReferenceResolver {
 
     @Override
     public boolean supports(FileRecord record) {
-        return true; // Language agnostic through LSP
+        return true;
     }
 
     @Override
     public Uni<List<Reference>> resolveReferences(FileRecord record, SymbolId target) {
-        String workspaceId = "default-workspace";
-
-        // In a real system, the target SymbolId would contain its defining Location
-        // or we'd resolve it to a line/character first.
-        // For the sake of the API skeleton, we mock position 1, 1
+        // Keep the existing position contract until SymbolId carries a real
+        // definition location. The workspace itself must never be guessed.
         int line = 1;
         int character = 1;
 
-        return codeTool.references(workspaceId, record.path(), line, character)
+        return codeTool.references(record.workspaceId(), record.path(), line, character)
                 .map(locations -> {
                     List<Reference> references = new ArrayList<>();
                     if (locations != null) {
@@ -44,7 +41,6 @@ public class LspReferenceResolver implements ReferenceResolver {
                                     loc.range().end().line() + 1,
                                     loc.range().start().character() + 1,
                                     loc.range().end().character() + 1);
-                            // Using UNKNOWN since LSP just returns locations without semantic kind
                             references.add(new Reference(target, Path.of(loc.uri()), range, ReferenceKind.UNKNOWN));
                         }
                     }

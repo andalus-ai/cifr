@@ -2,6 +2,7 @@ package tech.kayys.cifr.engine.index.symbol;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import tech.kayys.cifr.engine.index.FileRecord;
 import tech.kayys.muqabala.api.CodeTool;
 import tech.kayys.muqabala.language.LanguageTypes.SymbolEntry;
@@ -9,7 +10,6 @@ import tech.kayys.muqabala.language.LanguageTypes.SymbolEntry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class LspSymbolResolver implements SymbolResolver {
@@ -19,17 +19,12 @@ public class LspSymbolResolver implements SymbolResolver {
 
     @Override
     public boolean supports(FileRecord record) {
-        // Supported for any language muqabala understands
         return true;
     }
 
     @Override
     public Uni<List<SymbolInfo>> resolve(FileRecord record) {
-        // Mock workspace ID for now, since FileRecord doesn't carry it yet.
-        // In a complete integration, this would come from the context.
-        String workspaceId = "default-workspace";
-
-        return codeTool.documentSymbols(workspaceId, record.path())
+        return codeTool.documentSymbols(record.workspaceId(), record.path())
                 .map(entries -> {
                     List<SymbolInfo> symbols = new ArrayList<>();
                     if (entries != null) {
@@ -46,14 +41,11 @@ public class LspSymbolResolver implements SymbolResolver {
         SymbolKind kind = mapKindString(entry.kind());
         String name = entry.name();
         String qualified = parentId != null ? parentId.qualifiedName() + "." + name : name;
-
-        // Include containerName from LSP if parentId is null
         if (parentId == null && entry.containerName() != null && !entry.containerName().isBlank()) {
             qualified = entry.containerName() + "." + name;
         }
 
         SymbolId id = new SymbolId(qualified, name, "hash");
-
         SourceRange range = new SourceRange(
                 entry.range().start().line() + 1,
                 entry.range().end().line() + 1,
@@ -71,8 +63,7 @@ public class LspSymbolResolver implements SymbolResolver {
     }
 
     private SymbolKind mapKindString(String kindString) {
-        if (kindString == null)
-            return SymbolKind.VARIABLE;
+        if (kindString == null) return SymbolKind.VARIABLE;
         return switch (kindString.toLowerCase()) {
             case "class" -> SymbolKind.CLASS;
             case "interface" -> SymbolKind.INTERFACE;
