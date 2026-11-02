@@ -63,9 +63,7 @@ public class JBangTool implements CifrTool {
             int timeoutSec = argInt(args, "timeout", DEFAULT_TIMEOUT_SECONDS);
 
             // Prefer workspaceRoot from context (avoids ThreadLocal fallback)
-            Path workingDir = (context != null && context.workspaceRoot() != null)
-                    ? context.workspaceRoot().orElseGet(WorkspaceResolver::resolveWorkspaceRoot)
-                    : WorkspaceResolver.resolveWorkspaceRoot();
+            Path workingDir = WorkspaceResolver.resolveWorkspaceRoot(context);
             if (args.containsKey("working_dir") && args.get("working_dir") instanceof String wdStr) {
                 workingDir = Paths.get(wdStr);
             }
