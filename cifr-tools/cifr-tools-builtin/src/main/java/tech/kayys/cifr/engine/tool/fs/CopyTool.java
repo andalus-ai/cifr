@@ -12,9 +12,6 @@ import java.util.Set;
 
 @ApplicationScoped
 public class CopyTool implements CifrTool {
-
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -47,8 +44,8 @@ public class CopyTool implements CifrTool {
 
                 if (srcStr == null || dstStr == null) return new CopyResult(false, "Source and destination required");
 
-                Path src = WORKSPACE_ROOT.resolve(srcStr).normalize();
-                Path dst = WORKSPACE_ROOT.resolve(dstStr).normalize();
+                Path src = context.resolveWorkspacePath(srcStr);
+                Path dst = context.resolveWorkspacePath(dstStr);
 
                 if (!src.startsWith(WORKSPACE_ROOT) || !dst.startsWith(WORKSPACE_ROOT))
                     return new CopyResult(false, "Access denied: path outside workspace");
