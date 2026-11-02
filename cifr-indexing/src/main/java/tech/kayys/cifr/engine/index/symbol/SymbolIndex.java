@@ -18,7 +18,11 @@ public interface SymbolIndex {
         return searchSymbols(query);
     }
 
-    Uni<SymbolInfo> getSymbol(SymbolId id);\n\n    default Uni<SymbolInfo> getSymbol(SymbolId id, String workspaceId) {\n        return getSymbol(id);\n    }
+    Uni<SymbolInfo> getSymbol(SymbolId id);
+
+    default Uni<SymbolInfo> getSymbol(SymbolId id, String workspaceId) {
+        return getSymbol(id);
+    }
     void registerSymbol(SymbolInfo info);
     void clear();
 
