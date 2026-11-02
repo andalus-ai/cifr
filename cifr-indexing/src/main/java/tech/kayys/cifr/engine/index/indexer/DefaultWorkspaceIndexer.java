@@ -115,7 +115,9 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
 
     @Override
     public Uni<Void> removeFile(Path file, String workspaceId) {
-        return Uni.createFrom().item(() -> null);
+        return Uni.createFrom().item(() -> {
+            return null;
+        });
     }
 
     private boolean isIgnored(Path relativePath) {
@@ -145,6 +147,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
             }
             filesCount.incrementAndGet();
 
+            // Extract symbols if source code
             if ("java".equals(lang) || "dart".equals(lang) || "typescript".equals(lang) || "python".equals(lang)) {
                 extractSymbols(relative, content, symbolsCount);
                 extractDependencies(relative, content, depsCount);
@@ -156,7 +159,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     }
 
     private void extractSymbols(Path relative, String content, AtomicInteger symbolsCount) {
-        String[] lines = content.split("\\n");
+        String[] lines = content.split("\n");
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.startsWith("//") || line.startsWith("/*") || line.startsWith("*")) {
@@ -169,7 +172,10 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
                 SymbolId id = new SymbolId(typeName, "type", relative.toString());
                 SourceRange range = new SourceRange(i + 1, i + 1, 0, line.length());
                 SymbolInfo info = new SymbolInfo(id, typeName, SymbolKind.CLASS, relative, range, Optional.empty());
-                if (symbolIndex != null) symbolIndex.registerSymbol(info);
+
+                if (symbolIndex != null) {
+                    symbolIndex.registerSymbol(info);
+                }
                 symbolsCount.incrementAndGet();
             }
 
@@ -180,7 +186,10 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
                     SymbolId id = new SymbolId(methodName, "method", relative.toString());
                     SourceRange range = new SourceRange(i + 1, i + 1, 0, line.length());
                     SymbolInfo info = new SymbolInfo(id, methodName, SymbolKind.METHOD, relative, range, Optional.empty());
-                    if (symbolIndex != null) symbolIndex.registerSymbol(info);
+
+                    if (symbolIndex != null) {
+                        symbolIndex.registerSymbol(info);
+                    }
                     symbolsCount.incrementAndGet();
                 }
             }
@@ -192,7 +201,9 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         while (importMatcher.find()) {
             String imported = importMatcher.group(1);
             Dependency dep = new Dependency(relative.toString(), imported, DependencyKind.PACKAGE);
-            if (dependencyIndex != null) dependencyIndex.registerDependency(dep);
+            if (dependencyIndex != null) {
+                dependencyIndex.registerDependency(dep);
+            }
             depsCount.incrementAndGet();
         }
     }
