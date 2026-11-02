@@ -180,8 +180,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     }
 
     private void extractSymbols(Path relative, String content, AtomicInteger symbolsCount, String workspaceId) {
-        String[] lines = content.split("
-");
+        String[] lines = content.split("\\R");
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.startsWith("//") || line.startsWith("/*") || line.startsWith("*")) {
