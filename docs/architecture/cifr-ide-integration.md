@@ -97,10 +97,15 @@ The following are source-level findings from the current `main` tree:
 6. `CifrMcpAdapter` contains a Muqabalah-specific environment/property and
    falls back to `http://localhost:8080/mcp/sse`. This coupling should be
    removed only when the replacement CIFR IDE adapter is available.
-7. `CifrHarnessBridge` currently configures an allow-all capability scope,
-   no policy chain and no approval gate. The comments describe future
-   tightening; the bridge must not be treated as enforcing a complete
-   enterprise policy until that is implemented.
+7. `CifrHarnessBridge` previously configured an allow-all capability scope,
+   no policy chain and no approval gate. The follow-up hardening branch changes
+   the bridge to an exact, operator-configured tool allowlist (deny by default)
+   via `cifr.harness.allowed-tools` or `CIFR_HARNESS_ALLOWED_TOOLS`. This is
+   an execution opt-in, not a complete enterprise policy or human-approval
+   system: the upstream Andalus executor currently ignores
+   `REQUIRE_APPROVAL` capability decisions, and action metadata is currently
+   created as read-only. Do not expose high-risk tools through this bridge
+   until those upstream governance semantics are fixed and tested.
 8. `DefaultExecutionSandbox` starts a local `ProcessBuilder` directly and
    waits for process completion before draining stdout/stderr. It does not
    demonstrate OS/container isolation in that class and can block if child
