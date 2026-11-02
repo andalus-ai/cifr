@@ -11,7 +11,7 @@ import tech.kayys.cifr.engine.index.WorkspaceFingerprint;
 import tech.kayys.cifr.engine.index.dependency.Dependency;
 import tech.kayys.cifr.engine.index.dependency.DependencyIndex;
 import tech.kayys.cifr.engine.index.dependency.DependencyKind;
-import tech.kayys.cifr.engine.index.relation.RelationIndex;
+import tech.kayys.cifr.engine.index.relation.RelationIndex;\nimport tech.kayys.cifr.engine.index.ide.CifrIdeWorkspaceRegistry;
 import tech.kayys.cifr.engine.index.symbol.*;
 
 import java.io.IOException;
@@ -81,7 +81,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
                     .filter(path -> !isIgnored(root.relativize(path)))
                     .forEach(filePath -> {
                         Path relative = root.relativize(filePath);
-                        indexSingleFile(root, relative, workspaceId, filesCount, symbolsCount, depsCount);
+                        indexSingleFile(root, relative, effectiveWorkspaceId, filesCount, symbolsCount, depsCount);
                     });
             } catch (IOException e) {
                 LOG.errorf("Failed to index workspace at %s: %s", root, e.getMessage());
@@ -89,7 +89,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
 
             long duration = System.currentTimeMillis() - startTime;
             String repoHash = "hash-" + filesCount.get() + "-" + symbolsCount.get() + "-" + depsCount.get();
-            WorkspaceFingerprint fingerprint = new WorkspaceFingerprint(repoHash, "1.0", "cfg-" + workspaceId);
+            WorkspaceFingerprint fingerprint = new WorkspaceFingerprint(repoHash, "1.0", "cfg-" + effectiveWorkspaceId);
 
             LOG.infof("Indexed workspace: %d files, %d symbols, %d dependencies in %d ms",
                 filesCount.get(), symbolsCount.get(), depsCount.get(), duration);
@@ -102,13 +102,13 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     public Uni<Void> updateFile(Path file, Path workspaceRoot, String workspaceId) {
         return Uni.createFrom().item(() -> {
             Path root = workspaceRoot != null ? workspaceRoot.toAbsolutePath().normalize() : Path.of(".").toAbsolutePath().normalize();
-            Path relative = root.relativize(root.resolve(file).normalize());
+            String effectiveWorkspaceId = workspaceId == null || workspaceId.isBlank() ? "default-workspace" : workspaceId;\n            ensureIdeSession(root, effectiveWorkspaceId);\n            Path relative = root.relativize(root.resolve(file).normalize());
 
             AtomicInteger filesCount = new AtomicInteger(0);
             AtomicInteger symbolsCount = new AtomicInteger(0);
             AtomicInteger depsCount = new AtomicInteger(0);
 
-            indexSingleFile(root, relative, workspaceId, filesCount, symbolsCount, depsCount);
+            indexSingleFile(root, relative, effectiveWorkspaceId, filesCount, symbolsCount, depsCount);
             return null;
         });
     }
@@ -118,6 +118,19 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         return Uni.createFrom().item(() -> {
             return null;
         });
+    }
+
+    private void ensureIdeSession(Path root, String workspaceId) {
+        if (ideWorkspaces == null || ideWorkspaces.isOpen(workspaceId)) return;
+        try {
+            ideWorkspaces.openWorkspace(workspaceId, root);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.warnf("Interrupted while starting CIFR IDE for workspace %s", workspaceId);
+        } catch (Exception e) {
+            // Keep the lightweight indexer available when the optional IDE binary is absent.
+            LOG.warnf("CIFR IDE unavailable for workspace %s: %s", workspaceId, e.getMessage());
+        }
     }
 
     private boolean isIgnored(Path relativePath) {
