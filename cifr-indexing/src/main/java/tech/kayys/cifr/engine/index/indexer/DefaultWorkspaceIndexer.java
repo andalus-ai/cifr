@@ -155,8 +155,9 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     @Override
     public Uni<Void> closeWorkspace(String workspaceId) {
         return Uni.createFrom().item(() -> {
-            if (workspaceId != null && !workspaceId.isBlank() && ideWorkspaces != null) {
-                ideWorkspaces.closeWorkspace(workspaceId);
+            if (workspaceId != null && !workspaceId.isBlank()) {
+                if (ideWorkspaces != null) ideWorkspaces.closeWorkspace(workspaceId);
+                if (symbolIndex != null) symbolIndex.invalidateResolverCache(workspaceId);
             }
             return null;
         });
