@@ -110,12 +110,22 @@ public class DefaultSymbolIndex implements SymbolIndex {
     @Override
     public void removeFile(Path file, String workspaceId) {
         if (file == null || workspaceId == null || workspaceId.isBlank()) return;
-        String key = fileKey(workspaceId, file);
-        List<SymbolInfo> removed = symbolsByFile.remove(key);
-        if (removed == null) return;
-        for (SymbolInfo symbol : removed) {
-            String qualified = symbol.id() == null ? symbol.name() : symbol.id().qualifiedName();
-            symbolsById.remove(workspaceId + "|" + symbol.file() + "|" + qualified, symbol);
+        Path normalized = file.normalize();
+        List<String> matchingKeys = symbolsByFile.keySet().stream()
+                .filter(key -> key.startsWith(workspaceId + "|"))
+                .filter(key -> {
+                    String indexedPath = key.substring(workspaceId.length() + 1);
+                    Path indexed = Path.of(indexedPath).normalize();
+                    return indexed.equals(normalized) || indexed.endsWith(normalized) || normalized.endsWith(indexed);
+                })
+                .toList();
+        for (String key : matchingKeys) {
+            List<SymbolInfo> removed = symbolsByFile.remove(key);
+            if (removed == null) continue;
+            for (SymbolInfo symbol : removed) {
+                String qualified = symbol.id() == null ? symbol.name() : symbol.id().qualifiedName();
+                symbolsById.remove(workspaceId + "|" + symbol.file() + "|" + qualified, symbol);
+            }
         }
     }
 
