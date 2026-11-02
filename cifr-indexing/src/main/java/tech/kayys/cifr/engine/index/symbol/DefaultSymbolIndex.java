@@ -79,6 +79,20 @@ public class DefaultSymbolIndex implements SymbolIndex {
     }
 
     @Override
+    public Uni<SymbolInfo> getSymbol(SymbolId id, String workspaceId) {
+        if (id == null) return Uni.createFrom().nullItem();
+        SymbolInfo info = symbolsById.values().stream()
+                .filter(s -> workspaceId == null || workspaceId.equals(s.workspaceId()))
+                .filter(s -> s.id() != null && s.id().equals(id))
+                .findFirst().orElseGet(() -> symbolsById.values().stream()
+                        .filter(s -> workspaceId == null || workspaceId.equals(s.workspaceId()))
+                        .filter(s -> s.name().equalsIgnoreCase(id.qualifiedName())
+                                || (s.id() != null && s.id().qualifiedName().equalsIgnoreCase(id.qualifiedName())))
+                        .findFirst().orElse(null));
+        return Uni.createFrom().item(info);
+    }
+
+    @Override
     public void registerSymbol(SymbolInfo info) {
         if (info == null) return;
         String qualified = info.id() == null ? info.name() : info.id().qualifiedName();
