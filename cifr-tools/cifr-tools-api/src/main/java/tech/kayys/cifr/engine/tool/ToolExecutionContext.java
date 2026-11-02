@@ -1,6 +1,5 @@
 package tech.kayys.cifr.engine.tool;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -44,10 +43,11 @@ public record ToolExecutionContext(
      * Existing symlinks (including symlinked parents for new files) are checked
      * against the real workspace root to prevent escaping through symlinks.
      */
-    public Path resolveWorkspacePath(String suppliedPath) throws IOException {
+    public Path resolveWorkspacePath(String suppliedPath) {
         if (suppliedPath == null || suppliedPath.isBlank()) {
             throw new IllegalArgumentException("Workspace path cannot be empty");
         }
+        try {
         Path root = requireWorkspaceRoot().toRealPath();
         Path supplied = Path.of(suppliedPath);
         Path candidate = root.resolve(supplied).normalize();
@@ -66,5 +66,8 @@ public record ToolExecutionContext(
             throw new SecurityException("Path resolves outside workspace: " + suppliedPath);
         }
         return candidate;
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Unable to resolve path within workspace", e);
+        }
     }
 }
