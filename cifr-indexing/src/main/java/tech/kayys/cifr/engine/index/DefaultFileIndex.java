@@ -12,6 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -90,6 +91,22 @@ public class DefaultFileIndex implements FileIndex {
             Path indexed = record.path().normalize();
             return indexed.equals(normalized) || indexed.endsWith(normalized) || normalized.endsWith(indexed);
         });
+    }
+
+    @Override
+    public List<Path> removeMissingFiles(String workspaceId, Set<Path> presentFiles) {
+        if (workspaceId == null || workspaceId.isBlank()) return List.of();
+        Set<Path> present = presentFiles == null ? Set.of() : presentFiles;
+        List<Path> removed = new ArrayList<>();
+        fileRecords.entrySet().removeIf(entry -> {
+            FileRecord record = entry.getValue();
+            if (!workspaceId.equals(record.workspaceId()) || record.path() == null) return false;
+            Path path = record.path().normalize();
+            if (present.contains(path)) return false;
+            removed.add(path);
+            return true;
+        });
+        return removed;
     }
 
     @Override
