@@ -22,6 +22,8 @@ public class DefaultDependencyIndex implements DependencyIndex {
         String source = request.sourceIdentifier();
         List<Dependency> filtered = dependencies.stream()
             .filter(d -> d.source() != null && d.source().contains(source))
+            .filter(d -> request.workspaceId() == null || request.workspaceId().equals(d.workspaceId()))
+            .filter(d -> request.targetKindFilter() == null || request.targetKindFilter() == d.kind())
             .collect(Collectors.toList());
 
         return Uni.createFrom().item(filtered);
