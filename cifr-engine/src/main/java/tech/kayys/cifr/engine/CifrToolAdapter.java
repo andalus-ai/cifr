@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
@@ -78,15 +79,17 @@ public class CifrToolAdapter extends BaseResource implements Tool {
     public CompletableFuture<ToolResult> execute(ToolInvocation invocation, ToolContext context) {
         Map<String, Object> args = invocation != null && invocation.arguments() != null ? invocation.arguments() : Collections.emptyMap();
         ToolRequest req = new ToolRequest(invocation != null ? invocation.name() : "", args, Optional.empty(), Collections.emptyList());
-        ToolExecutionContext execCtx = new ToolExecutionContext(
+        Path workspaceRoot = workspacePath == null || workspacePath.isBlank()
+                ? null : Path.of(workspacePath).toAbsolutePath().normalize();
+        String workspaceId = workspaceRoot != null ? workspaceRoot.toString() : "workspace-unresolved";
+        ToolExecutionContext execCtx = ToolExecutionContext.of(
                 "task-" + System.currentTimeMillis(),
-                "workspace-default",
+                workspaceId,
                 CodingPolicy.defaultPolicy(),
                 Optional.empty(),
-                () -> {}
+                () -> {},
+                workspaceRoot
         );
-
-        tech.kayys.cifr.engine.tool.WorkspaceResolver.setSessionWorkspace(workspacePath);
 
         return delegate.execute(req, execCtx)
                 .map(res -> {
@@ -127,7 +130,6 @@ public class CifrToolAdapter extends BaseResource implements Tool {
                     }
                     return (ToolResult) new OutputToolResult(Id.random());
                 })
-                .onTermination().invoke(() -> tech.kayys.cifr.engine.tool.WorkspaceResolver.clearSessionWorkspace())
                 .subscribeAsCompletionStage();
     }
 }
