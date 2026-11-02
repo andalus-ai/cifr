@@ -15,13 +15,13 @@ public class DefaultDependencyIndex implements DependencyIndex {
 
     @Override
     public Uni<List<Dependency>> getDependencies(DependencyRequest request) {
-        if (request == null || request.sourceIdentifier() == null) {
+        if (request == null) {
             return Uni.createFrom().item(new ArrayList<>(dependencies));
         }
 
-        String source = request.sourceIdentifier();
         List<Dependency> filtered = dependencies.stream()
-            .filter(d -> d.source() != null && d.source().contains(source))
+            .filter(d -> request.sourceIdentifier() == null
+                    || (d.source() != null && d.source().contains(request.sourceIdentifier())))
             .filter(d -> request.workspaceId() == null || request.workspaceId().equals(d.workspaceId()))
             .filter(d -> request.targetKindFilter() == null || request.targetKindFilter() == d.kind())
             .collect(Collectors.toList());
