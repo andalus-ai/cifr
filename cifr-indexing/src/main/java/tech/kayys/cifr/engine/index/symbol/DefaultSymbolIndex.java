@@ -116,7 +116,7 @@ public class DefaultSymbolIndex implements SymbolIndex {
                 .filter(key -> {
                     String indexedPath = key.substring(workspaceId.length() + 1);
                     Path indexed = Path.of(indexedPath).normalize();
-                    return indexed.equals(normalized) || indexed.endsWith(normalized) || normalized.endsWith(indexed);
+                    return indexed.equals(normalized);
                 })
                 .toList();
         for (String key : matchingKeys) {
