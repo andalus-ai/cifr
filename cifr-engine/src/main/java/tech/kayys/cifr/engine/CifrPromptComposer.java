@@ -64,13 +64,13 @@ public final class CifrPromptComposer {
                                 """;
 
                 String ideLspSection = """
-
+                
                                 IDE/LSP boundary:
-                                - `Modules/muqabala` is the headless IDE/LSP kernel for this workspace.
-                                - For language-intelligence workflows such as hover, definition, references, completion, document symbols, workspace symbols, rename, code actions, diagnostics, formatting, or semantic tokens, prefer Muqabala's `CodeTool` surface through its MCP tools when available.
-                                - Do NOT add raw LSP4J, language-server process management, or LSP protocol plumbing inside Andalus Code; that belongs in `Modules/muqabala/src/main/java/tech/kayys/muqabala/lsp` and `.../language`.
-                                - If Muqabala MCP tools are not available, report that the Muqabala kernel/MCP endpoint needs to be started or configured, then fall back to `semantic_search`, `search_files`, and `read_file` for best-effort static inspection.
-                                - Plain file reads, stack-trace source lookups, and Dart `package:` URI reads may still use Andalus Code's `read_file`.
+                                - CIFR IDE (`cifridea-server --stdio`) is the headless IDE/LSP host for this workspace; CIFR connects to it through the CIFR IDE client.
+                                - Use CIFR's workspace-aware `find_symbol` and `find_references` tools for semantic navigation when available; use the repository indexing/search tools for broader discovery and static fallback.
+                                - Do NOT add raw LSP4J, language-server process management, or LSP protocol plumbing inside the coding agent. IDE process, document, project, and language-server state belongs to CIFR IDE.
+                                - MCP servers are discovered only from explicit workspace/global MCP configuration. Do not assume a Muqabala service, endpoint, or tool namespace exists.
+                                - Plain file reads, stack-trace source lookups, and Dart `package:` URI reads may still use `read_file`.
                                 """;
 
                 String basePrompt = ("""
