@@ -83,13 +83,22 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
                 return new IndexResult(0, 0, 0, new WorkspaceFingerprint("empty", "1.0", "empty"), 0);
             }
 
+            Set<Path> indexedPaths = new HashSet<>();
             try (Stream<Path> stream = Files.walk(root)) {
                 stream.filter(Files::isRegularFile)
                     .filter(path -> !isIgnored(root.relativize(path)))
                     .forEach(filePath -> {
-                        Path relative = root.relativize(filePath);
+                        Path relative = root.relativize(filePath).normalize();
+                        indexedPaths.add(relative);
                         indexSingleFile(root, relative, effectiveWorkspaceId, filesCount, symbolsCount, depsCount);
                     });
+                if (fileIndex != null) {
+                    for (Path removed : fileIndex.removeMissingFiles(effectiveWorkspaceId, indexedPaths)) {
+                        if (symbolIndex != null) symbolIndex.removeFile(removed, effectiveWorkspaceId);
+                        if (dependencyIndex != null) dependencyIndex.removeFile(removed.toString(), effectiveWorkspaceId);
+                    }
+                    if (symbolIndex != null) symbolIndex.invalidateResolverCache(effectiveWorkspaceId);
+                }
             } catch (IOException e) {
                 LOG.errorf("Failed to index workspace at %s: %s", root, e.getMessage());
             }
@@ -174,6 +183,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
             String content = Files.readString(absPath);
             String contentHash = String.valueOf(content.hashCode());
 
+            removeIndexedFile(relative, workspaceId);
             FileRecord record = new FileRecord(relative, contentHash, size, lang, false, isTest, role, workspaceId);
             if (fileIndex != null) {
                 fileIndex.registerFile(record);
