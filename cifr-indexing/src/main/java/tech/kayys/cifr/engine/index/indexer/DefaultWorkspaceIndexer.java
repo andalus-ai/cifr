@@ -11,7 +11,8 @@ import tech.kayys.cifr.engine.index.WorkspaceFingerprint;
 import tech.kayys.cifr.engine.index.dependency.Dependency;
 import tech.kayys.cifr.engine.index.dependency.DependencyIndex;
 import tech.kayys.cifr.engine.index.dependency.DependencyKind;
-import tech.kayys.cifr.engine.index.relation.RelationIndex;\nimport tech.kayys.cifr.engine.index.ide.CifrIdeWorkspaceRegistry;
+import tech.kayys.cifr.engine.index.relation.RelationIndex;
+import tech.kayys.cifr.engine.index.ide.CifrIdeWorkspaceRegistry;
 import tech.kayys.cifr.engine.index.symbol.*;
 
 import java.io.IOException;
@@ -107,7 +108,9 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     public Uni<Void> updateFile(Path file, Path workspaceRoot, String workspaceId) {
         return Uni.createFrom().item(() -> {
             Path root = workspaceRoot != null ? workspaceRoot.toAbsolutePath().normalize() : Path.of(".").toAbsolutePath().normalize();
-            String effectiveWorkspaceId = workspaceId == null || workspaceId.isBlank() ? "default-workspace" : workspaceId;\n            ensureIdeSession(root, effectiveWorkspaceId);\n            Path relative = root.relativize(root.resolve(file).normalize());
+            String effectiveWorkspaceId = workspaceId == null || workspaceId.isBlank() ? "default-workspace" : workspaceId;
+            ensureIdeSession(root, effectiveWorkspaceId);
+            Path relative = root.relativize(root.resolve(file).normalize());
 
             AtomicInteger filesCount = new AtomicInteger(0);
             AtomicInteger symbolsCount = new AtomicInteger(0);
@@ -177,7 +180,8 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     }
 
     private void extractSymbols(Path relative, String content, AtomicInteger symbolsCount, String workspaceId) {
-        String[] lines = content.split("\n");
+        String[] lines = content.split("
+");
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.startsWith("//") || line.startsWith("/*") || line.startsWith("*")) {
