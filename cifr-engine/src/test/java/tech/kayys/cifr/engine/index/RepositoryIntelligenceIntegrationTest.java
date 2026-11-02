@@ -4,65 +4,70 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tech.kayys.cifr.engine.index.dependency.DependencyRequest;
 import tech.kayys.cifr.engine.index.dependency.DependencyKind;
+import tech.kayys.cifr.engine.index.dependency.DefaultDependencyIndex;
+import tech.kayys.cifr.engine.index.reference.DefaultReferenceIndex;
 import tech.kayys.cifr.engine.index.reference.ReferenceRequest;
+import tech.kayys.cifr.engine.index.relation.DefaultRelationIndex;
 import tech.kayys.cifr.engine.index.relation.RelatedFileRequest;
+import tech.kayys.cifr.engine.index.symbol.DefaultSymbolIndex;
+import tech.kayys.cifr.engine.index.symbol.SourceRange;
 import tech.kayys.cifr.engine.index.symbol.SymbolId;
 import tech.kayys.cifr.engine.index.symbol.SymbolInfo;
 import tech.kayys.cifr.engine.index.symbol.SymbolKind;
-import tech.kayys.cifr.engine.index.reference.DefaultReferenceIndex;
-import tech.kayys.cifr.engine.index.symbol.DefaultSymbolIndex;
-import tech.kayys.cifr.engine.index.dependency.DefaultDependencyIndex;
-import tech.kayys.cifr.engine.index.relation.DefaultRelationIndex;
 
 import java.nio.file.Path;
-import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class RepositoryIntelligenceIntegrationTest {
 
-    DefaultRepositoryIntelligence repositoryIntelligence;
+    private DefaultRepositoryIntelligence repositoryIntelligence;
+    private DefaultFileIndex fileIndex;
+    private DefaultSymbolIndex symbolIndex;
+    private DefaultReferenceIndex referenceIndex;
+    private SymbolId target;
 
     @BeforeEach
     public void setup() {
         repositoryIntelligence = new DefaultRepositoryIntelligence();
-        repositoryIntelligence.symbolIndex = new DefaultSymbolIndex();
-        var refIdx = new DefaultReferenceIndex();
-        try {
-            var resolver = new tech.kayys.cifr.engine.index.reference.LspReferenceResolver();
-            java.lang.reflect.Field ctf = tech.kayys.cifr.engine.index.reference.LspReferenceResolver.class.getDeclaredField("codeTool");
-            ctf.setAccessible(true);
-            ctf.set(resolver, new MockCodeTool());
-            
-            java.lang.reflect.Field f = DefaultReferenceIndex.class.getDeclaredField("referenceResolver");
-            f.setAccessible(true);
-            f.set(refIdx, resolver);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        repositoryIntelligence.referenceIndex = refIdx;
+        fileIndex = new DefaultFileIndex();
+        symbolIndex = new DefaultSymbolIndex();
+        referenceIndex = new DefaultReferenceIndex();
+        target = new SymbolId("MockClass.mockMethod", "mockMethod", "MockClass.java");
+
+        fileIndex.registerFile(new FileRecord(
+                Path.of("MockClass.java"), "hash", 128, "java", false, false, FileRole.SOURCE));
+        symbolIndex.registerSymbol(new SymbolInfo(
+                target, "mockMethod", SymbolKind.METHOD, Path.of("MockClass.java"),
+                new SourceRange(10, 10, 0, 20), Optional.empty()));
+
+        repositoryIntelligence.fileIndex = fileIndex;
+        repositoryIntelligence.symbolIndex = symbolIndex;
+        repositoryIntelligence.referenceIndex = referenceIndex;
         repositoryIntelligence.dependencyIndex = new DefaultDependencyIndex();
         repositoryIntelligence.relationIndex = new DefaultRelationIndex();
+
+        // The unit test deliberately has no running IDE host. The reference index
+        // must safely return no results rather than fabricate a definition location.
+        setField(referenceIndex, "fileIndex", fileIndex);
+        setField(referenceIndex, "symbolIndex", symbolIndex);
     }
 
     @Test
     public void testSymbolResolution() {
-        SymbolId id = new SymbolId("MockClass.mockMethod", "mockMethod", "hash");
-        SymbolInfo info = repositoryIntelligence.symbol(id).await().indefinitely();
-        assertNull(info);
+        SymbolInfo info = repositoryIntelligence.symbol(target).await().indefinitely();
+        assertNotNull(info);
+        assertEquals("mockMethod", info.name());
+        assertEquals("default-workspace", info.workspaceId());
     }
 
     @Test
-    public void testReferenceResolution() {
-        SymbolId target = new SymbolId("MockClass.mockMethod", "mockMethod", "hash");
+    public void testReferenceResolutionWithoutIdeHost() {
         ReferenceRequest request = new ReferenceRequest(target, 10);
-        
         var references = repositoryIntelligence.references(request).await().indefinitely();
         assertNotNull(references);
-        // DefaultReferenceIndex currently returns null if it can't find FileRecord, or wait, it returns empty?
-        // Ah, our DefaultReferenceIndex uses fileIndex which is null in this test! Let's mock it.
-        // Actually, if fileIndex is null, it might throw NPE. Let's see if we can catch it.
-        // But in Phase 14 I implemented DefaultReferenceIndex to use MockCodeTool.
+        assertTrue(references.isEmpty(), "references require a live CIFR IDE resolver");
     }
 
     @Test
@@ -79,5 +84,15 @@ public class RepositoryIntelligenceIntegrationTest {
         var relations = repositoryIntelligence.related(request).await().indefinitely();
         assertNotNull(relations);
         assertTrue(relations.isEmpty());
+    }
+
+    private static void setField(Object target, String name, Object value) {
+        try {
+            var field = target.getClass().getDeclaredField(name);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Unable to configure test field " + name, e);
+        }
     }
 }
