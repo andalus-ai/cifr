@@ -61,8 +61,11 @@ public class LspSymbolResolver implements SymbolResolver {
                         record.path(), sourceRange, Optional.empty(), record.workspaceId()));
             }
             return symbols;
-        } catch (IOException | InterruptedException | TimeoutException e) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            throw new IllegalStateException("CIFR IDE symbol lookup interrupted for workspace "
+                    + record.workspaceId() + " and file " + record.path(), e);
+        } catch (IOException | TimeoutException e) {
             throw new IllegalStateException("CIFR IDE symbol lookup failed for workspace "
                     + record.workspaceId() + " and file " + record.path(), e);
         }
