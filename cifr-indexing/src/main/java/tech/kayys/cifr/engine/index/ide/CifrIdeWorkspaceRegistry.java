@@ -34,7 +34,7 @@ public class CifrIdeWorkspaceRegistry {
         if (existing != null && existing.root().equals(normalizedRoot)) return;
         closeWorkspace(workspaceId);
         List<String> command = configuredCommand();
-        CifrIdeClient client = CifrIdeClient.start(command, root, Duration.ofSeconds(30), null);
+        CifrIdeClient client = CifrIdeClient.start(command, normalizedRoot, Duration.ofSeconds(30), null);
         try {
             JsonNode project = client.invoke(workspaceId, "open_project",
                     Map.of("path", root.toAbsolutePath().normalize().toString()));
@@ -61,6 +61,7 @@ public class CifrIdeWorkspaceRegistry {
     }
 
     public synchronized void closeWorkspace(String workspaceId) {
+        if (workspaceId == null || workspaceId.isBlank()) return;
         Session session = sessions.remove(workspaceId);
         if (session == null) return;
         try {
