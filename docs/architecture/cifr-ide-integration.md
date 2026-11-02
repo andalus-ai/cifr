@@ -140,7 +140,7 @@ The following are source-level findings from the current `main` tree:
   `SymbolInfo` location before invoking `lsp_references`.
 - Carry workspace root and workspace/session identity explicitly through
   indexing and tool execution; do not infer it from a process-global setting.
-- The direct Maven dependencies and implicit MCP endpoint have been removed from the integration branch. Finish the full repository and test-source audit before merging; do not restore an implicit service dependency.
+- The direct Maven dependencies and implicit MCP endpoint have been removed from the integration branch. The retired `MockCodeTool` test fixture was replaced with tests at the CIFR IDE boundary; all 46 remaining Java test files were checked for Muqabalah references. Complete the production-source audit and run the Maven reactor before merging; do not restore an implicit service dependency.
 
 ### Phase D — unify repository intelligence without losing CIFR semantics
 
