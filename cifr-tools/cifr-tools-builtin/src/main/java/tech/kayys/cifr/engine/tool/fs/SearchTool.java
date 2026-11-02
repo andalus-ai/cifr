@@ -15,8 +15,6 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class SearchTool implements CifrTool {
-
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final int DEFAULT_LIMIT = 50;
 
     @Override
@@ -54,7 +52,7 @@ public class SearchTool implements CifrTool {
             String subPath = (String) request.arguments().getOrDefault("path", ".");
             int limit = ((Number) request.arguments().getOrDefault("limit", DEFAULT_LIMIT)).intValue();
 
-            Path searchRoot = WORKSPACE_ROOT.resolve(subPath).normalize();
+            Path searchRoot = context.resolveWorkspacePath(subPath);
             if (!searchRoot.startsWith(WORKSPACE_ROOT) || !Files.exists(searchRoot)) {
                 return new SearchResult(query, List.of(), false);
             }
@@ -86,7 +84,7 @@ public class SearchTool implements CifrTool {
                             String line = lines.get(i);
                             if (pattern.matcher(line).find()) {
                                 matches.add(new SearchMatch(
-                                    WORKSPACE_ROOT.relativize(file).toString(),
+                                    context.requireWorkspaceRoot().relativize(file).toString(),
                                     i + 1,
                                     line.trim()
                                 ));
