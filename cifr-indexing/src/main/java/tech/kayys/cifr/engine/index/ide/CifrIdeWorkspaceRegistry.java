@@ -45,6 +45,10 @@ public class CifrIdeWorkspaceRegistry {
         }
     }
 
+    public boolean isOpen(String workspaceId) {
+        return workspaceId != null && sessions.containsKey(workspaceId);
+    }
+
     public Session require(String workspaceId) {
         Session session = sessions.get(workspaceId);
         if (session == null) {
