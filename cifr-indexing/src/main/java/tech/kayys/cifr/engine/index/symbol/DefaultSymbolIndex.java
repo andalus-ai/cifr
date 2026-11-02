@@ -34,20 +34,21 @@ public class DefaultSymbolIndex implements SymbolIndex {
         }
         String key = fileKey(workspaceId, file);
         List<SymbolInfo> cached = symbolsByFile.get(key);
-        if (cached != null && !cached.isEmpty()) {
-            return Uni.createFrom().item(new ArrayList<>(cached));
-        }
         if (fileIndex == null || symbolResolver == null) {
-            return Uni.createFrom().item(List.of());
+            return Uni.createFrom().item(cached == null ? List.of() : new ArrayList<>(cached));
         }
         return fileIndex.getCurrentIndex(workspaceId).onItem().transformToUni(records -> {
             FileRecord record = records.stream()
                     .filter(r -> samePath(r.path(), file))
                     .findFirst().orElse(null);
             if (record == null || !symbolResolver.supports(record)) {
-                return Uni.createFrom().item(List.of());
+                return Uni.createFrom().item(cached == null ? List.of() : new ArrayList<>(cached));
             }
-            return symbolResolver.resolve(record).onItem().invoke(found -> found.forEach(this::registerSymbol));
+            return symbolResolver.resolve(record).onItem().invoke(found -> {
+                if (found != null) found.forEach(this::registerSymbol);
+            }).onItem().transform(found -> found == null || found.isEmpty()
+                    ? (cached == null ? List.of() : new ArrayList<>(cached))
+                    : found);
         });
     }
 
