@@ -12,8 +12,6 @@ import java.util.Set;
 
 @ApplicationScoped
 public class WriteFileTool implements CifrTool {
-
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final int MAX_WRITE_SIZE = 50 * 1024 * 1024; // 50MB
 
     @Override
@@ -50,7 +48,7 @@ public class WriteFileTool implements CifrTool {
                     return new WriteFileResult(false, "Path cannot be empty", null);
                 }
 
-                Path absolutePath = WORKSPACE_ROOT.resolve(pathStr).normalize();
+                Path absolutePath = context.resolveWorkspacePath(pathStr);
                 if (!absolutePath.startsWith(WORKSPACE_ROOT)) {
                     return new WriteFileResult(false, "Access denied: path outside workspace", null);
                 }
