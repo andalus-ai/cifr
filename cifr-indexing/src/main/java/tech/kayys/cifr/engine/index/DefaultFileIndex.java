@@ -81,6 +81,13 @@ public class DefaultFileIndex implements FileIndex {
     }
 
     @Override
+    public void removeFile(Path file, String workspaceId) {
+        if (file == null || workspaceId == null || workspaceId.isBlank()) return;
+        String key = workspaceId + "|" + file.normalize();
+        fileRecords.remove(key);
+    }
+
+    @Override
     public void clear() {
         fileRecords.clear();
     }
