@@ -69,7 +69,7 @@ public final class CifrPromptComposer {
                                 - CIFR IDE (`cifridea-server --stdio`) is the headless IDE/LSP host for this workspace; CIFR connects to it through the CIFR IDE client.
                                 - Use CIFR's workspace-aware `find_symbol` and `find_references` tools for semantic navigation when available; use the repository indexing/search tools for broader discovery and static fallback.
                                 - Do NOT add raw LSP4J, language-server process management, or LSP protocol plumbing inside the coding agent. IDE process, document, project, and language-server state belongs to CIFR IDE.
-                                - MCP servers are discovered only from explicit workspace/global MCP configuration. Do not assume a Muqabala service, endpoint, or tool namespace exists.
+                                - MCP servers are discovered only from explicit workspace/global MCP configuration; IDE language intelligence is provided by CIFR IDE, not an implicit MCP dependency.
                                 - Plain file reads, stack-trace source lookups, and Dart `package:` URI reads may still use `read_file`.
                                 """;
 
