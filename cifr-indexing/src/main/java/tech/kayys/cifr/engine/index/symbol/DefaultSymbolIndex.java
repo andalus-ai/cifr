@@ -108,6 +108,18 @@ public class DefaultSymbolIndex implements SymbolIndex {
     }
 
     @Override
+    public void removeFile(Path file, String workspaceId) {
+        if (file == null || workspaceId == null || workspaceId.isBlank()) return;
+        String key = fileKey(workspaceId, file);
+        List<SymbolInfo> removed = symbolsByFile.remove(key);
+        if (removed == null) return;
+        for (SymbolInfo symbol : removed) {
+            String qualified = symbol.id() == null ? symbol.name() : symbol.id().qualifiedName();
+            symbolsById.remove(workspaceId + "|" + symbol.file() + "|" + qualified, symbol);
+        }
+    }
+
+    @Override
     public void clear() {
         symbolsById.clear();
         symbolsByFile.clear();
