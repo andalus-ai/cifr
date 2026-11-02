@@ -57,6 +57,7 @@
         <module>cifr-skills</module>
         <module>cifr-toolchains</module>
         <module>cifr-indexing</module>
+        <module>cifr-ide-client</module>
         <module>cifr-security</module>
         <module>cifr-standalone</module>
         <module>cifr-engine</module>
