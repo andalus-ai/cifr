@@ -12,6 +12,7 @@ import tech.kayys.cifr.engine.index.dependency.Dependency;
 import tech.kayys.cifr.engine.index.dependency.DependencyIndex;
 import tech.kayys.cifr.engine.index.dependency.DependencyKind;
 import tech.kayys.cifr.engine.index.relation.RelationIndex;
+import tech.kayys.cifr.engine.index.ide.CifrIdeWorkspaceRegistry;
 import tech.kayys.cifr.engine.index.symbol.*;
 
 import java.io.IOException;
@@ -52,6 +53,9 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     @Inject
     RelationIndex relationIndex;
 
+    @Inject
+    CifrIdeWorkspaceRegistry ideWorkspaces;
+
     public DefaultWorkspaceIndexer() {
     }
 
@@ -67,29 +71,50 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         return Uni.createFrom().item(() -> {
             long startTime = System.currentTimeMillis();
             Path root = workspaceRoot != null ? workspaceRoot.toAbsolutePath().normalize() : Path.of(".").toAbsolutePath().normalize();
+            String effectiveWorkspaceId = workspaceId == null || workspaceId.isBlank() ? "default-workspace" : workspaceId;
+            ensureIdeSession(root, effectiveWorkspaceId);
+            if (symbolIndex != null) symbolIndex.invalidateResolverCache(effectiveWorkspaceId);
 
             AtomicInteger filesCount = new AtomicInteger(0);
             AtomicInteger symbolsCount = new AtomicInteger(0);
             AtomicInteger depsCount = new AtomicInteger(0);
 
             if (!Files.exists(root)) {
+                if (fileIndex != null) {
+                    for (Path removed : fileIndex.removeMissingFiles(effectiveWorkspaceId, Set.of())) {
+                        if (symbolIndex != null) symbolIndex.removeFile(removed, effectiveWorkspaceId);
+                        if (dependencyIndex != null) dependencyIndex.removeFile(removed.toString(), effectiveWorkspaceId);
+                    }
+                }
+                if (symbolIndex != null) {
+                    symbolIndex.invalidateResolverCache(effectiveWorkspaceId);
+                }
                 return new IndexResult(0, 0, 0, new WorkspaceFingerprint("empty", "1.0", "empty"), 0);
             }
 
+            Set<Path> indexedPaths = new HashSet<>();
             try (Stream<Path> stream = Files.walk(root)) {
                 stream.filter(Files::isRegularFile)
                     .filter(path -> !isIgnored(root.relativize(path)))
                     .forEach(filePath -> {
-                        Path relative = root.relativize(filePath);
-                        indexSingleFile(root, relative, workspaceId, filesCount, symbolsCount, depsCount);
+                        Path relative = root.relativize(filePath).normalize();
+                        indexedPaths.add(relative);
+                        indexSingleFile(root, relative, effectiveWorkspaceId, filesCount, symbolsCount, depsCount);
                     });
+                if (fileIndex != null) {
+                    for (Path removed : fileIndex.removeMissingFiles(effectiveWorkspaceId, indexedPaths)) {
+                        if (symbolIndex != null) symbolIndex.removeFile(removed, effectiveWorkspaceId);
+                        if (dependencyIndex != null) dependencyIndex.removeFile(removed.toString(), effectiveWorkspaceId);
+                    }
+                    if (symbolIndex != null) symbolIndex.invalidateResolverCache(effectiveWorkspaceId);
+                }
             } catch (IOException e) {
                 LOG.errorf("Failed to index workspace at %s: %s", root, e.getMessage());
             }
 
             long duration = System.currentTimeMillis() - startTime;
             String repoHash = "hash-" + filesCount.get() + "-" + symbolsCount.get() + "-" + depsCount.get();
-            WorkspaceFingerprint fingerprint = new WorkspaceFingerprint(repoHash, "1.0", "cfg-" + workspaceId);
+            WorkspaceFingerprint fingerprint = new WorkspaceFingerprint(repoHash, "1.0", "cfg-" + effectiveWorkspaceId);
 
             LOG.infof("Indexed workspace: %d files, %d symbols, %d dependencies in %d ms",
                 filesCount.get(), symbolsCount.get(), depsCount.get(), duration);
@@ -102,13 +127,17 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     public Uni<Void> updateFile(Path file, Path workspaceRoot, String workspaceId) {
         return Uni.createFrom().item(() -> {
             Path root = workspaceRoot != null ? workspaceRoot.toAbsolutePath().normalize() : Path.of(".").toAbsolutePath().normalize();
+            String effectiveWorkspaceId = workspaceId == null || workspaceId.isBlank() ? "default-workspace" : workspaceId;
+            ensureIdeSession(root, effectiveWorkspaceId);
             Path relative = root.relativize(root.resolve(file).normalize());
+            removeIndexedFile(relative, effectiveWorkspaceId);
+            if (symbolIndex != null) symbolIndex.invalidateResolverCache(effectiveWorkspaceId);
 
             AtomicInteger filesCount = new AtomicInteger(0);
             AtomicInteger symbolsCount = new AtomicInteger(0);
             AtomicInteger depsCount = new AtomicInteger(0);
 
-            indexSingleFile(root, relative, workspaceId, filesCount, symbolsCount, depsCount);
+            indexSingleFile(root, relative, effectiveWorkspaceId, filesCount, symbolsCount, depsCount);
             return null;
         });
     }
@@ -116,8 +145,41 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     @Override
     public Uni<Void> removeFile(Path file, String workspaceId) {
         return Uni.createFrom().item(() -> {
+            if (file == null || workspaceId == null || workspaceId.isBlank()) return null;
+            removeIndexedFile(file.normalize(), workspaceId);
+            if (symbolIndex != null) symbolIndex.invalidateResolverCache(workspaceId);
             return null;
         });
+    }
+
+    @Override
+    public Uni<Void> closeWorkspace(String workspaceId) {
+        return Uni.createFrom().item(() -> {
+            if (workspaceId != null && !workspaceId.isBlank()) {
+                if (ideWorkspaces != null) ideWorkspaces.closeWorkspace(workspaceId);
+                if (symbolIndex != null) symbolIndex.invalidateResolverCache(workspaceId);
+            }
+            return null;
+        });
+    }
+
+    private void removeIndexedFile(Path relative, String workspaceId) {
+        if (fileIndex != null) fileIndex.removeFile(relative, workspaceId);
+        if (symbolIndex != null) symbolIndex.removeFile(relative, workspaceId);
+        if (dependencyIndex != null) dependencyIndex.removeFile(relative.toString(), workspaceId);
+    }
+
+    private void ensureIdeSession(Path root, String workspaceId) {
+        if (ideWorkspaces == null || ideWorkspaces.isOpen(workspaceId)) return;
+        try {
+            ideWorkspaces.openWorkspace(workspaceId, root);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.warnf("Interrupted while starting CIFR IDE for workspace %s", workspaceId);
+        } catch (Exception e) {
+            // Keep the lightweight indexer available when the optional IDE binary is absent.
+            LOG.warnf("CIFR IDE unavailable for workspace %s: %s", workspaceId, e.getMessage());
+        }
     }
 
     private boolean isIgnored(Path relativePath) {
@@ -141,6 +203,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
             String content = Files.readString(absPath);
             String contentHash = String.valueOf(content.hashCode());
 
+            removeIndexedFile(relative, workspaceId);
             FileRecord record = new FileRecord(relative, contentHash, size, lang, false, isTest, role, workspaceId);
             if (fileIndex != null) {
                 fileIndex.registerFile(record);
@@ -149,8 +212,8 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
 
             // Extract symbols if source code
             if ("java".equals(lang) || "dart".equals(lang) || "typescript".equals(lang) || "python".equals(lang)) {
-                extractSymbols(relative, content, symbolsCount);
-                extractDependencies(relative, content, depsCount);
+                extractSymbols(relative, content, symbolsCount, workspaceId);
+                extractDependencies(relative, content, depsCount, workspaceId);
             }
 
         } catch (IOException e) {
@@ -158,8 +221,8 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         }
     }
 
-    private void extractSymbols(Path relative, String content, AtomicInteger symbolsCount) {
-        String[] lines = content.split("\n");
+    private void extractSymbols(Path relative, String content, AtomicInteger symbolsCount, String workspaceId) {
+        String[] lines = content.split("\\R");
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.startsWith("//") || line.startsWith("/*") || line.startsWith("*")) {
@@ -171,7 +234,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
                 String typeName = typeMatcher.group(1);
                 SymbolId id = new SymbolId(typeName, "type", relative.toString());
                 SourceRange range = new SourceRange(i + 1, i + 1, 0, line.length());
-                SymbolInfo info = new SymbolInfo(id, typeName, SymbolKind.CLASS, relative, range, Optional.empty());
+                SymbolInfo info = new SymbolInfo(id, typeName, SymbolKind.CLASS, relative, range, Optional.empty(), workspaceId);
 
                 if (symbolIndex != null) {
                     symbolIndex.registerSymbol(info);
@@ -185,7 +248,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
                 if (!methodName.equals("if") && !methodName.equals("for") && !methodName.equals("while") && !methodName.equals("switch")) {
                     SymbolId id = new SymbolId(methodName, "method", relative.toString());
                     SourceRange range = new SourceRange(i + 1, i + 1, 0, line.length());
-                    SymbolInfo info = new SymbolInfo(id, methodName, SymbolKind.METHOD, relative, range, Optional.empty());
+                    SymbolInfo info = new SymbolInfo(id, methodName, SymbolKind.METHOD, relative, range, Optional.empty(), workspaceId);
 
                     if (symbolIndex != null) {
                         symbolIndex.registerSymbol(info);
@@ -196,11 +259,11 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         }
     }
 
-    private void extractDependencies(Path relative, String content, AtomicInteger depsCount) {
+    private void extractDependencies(Path relative, String content, AtomicInteger depsCount, String workspaceId) {
         Matcher importMatcher = IMPORT_PATTERN.matcher(content);
         while (importMatcher.find()) {
             String imported = importMatcher.group(1);
-            Dependency dep = new Dependency(relative.toString(), imported, DependencyKind.PACKAGE);
+            Dependency dep = new Dependency(relative.toString(), imported, DependencyKind.PACKAGE, workspaceId);
             if (dependencyIndex != null) {
                 dependencyIndex.registerDependency(dep);
             }

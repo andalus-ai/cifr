@@ -1,7 +1,8 @@
 # CIFR and CIFR IDE integration
 
-**Status:** integration foundation; Java-to-Rust client and resolver migration
-remain follow-up implementation work.
+**Status:** Java-to-Rust client and indexing resolver migration implemented on
+`feat/cifr-ide-indexing-migration`; see [PR #8](https://github.com/andalus-ai/cifr/pull/8).
+Build and live-host verification remain outstanding.
 
 ## 1. Target ownership
 
@@ -108,7 +109,7 @@ The following are source-level findings from the current `main` tree:
 
 ## 5. Migration sequence
 
-### Phase A — make the headless IDE host buildable
+### Phase A — make the headless IDE host buildable (implemented; verification pending)
 
 - Keep the Rust crates under `cifr-ide/crates/*`.
 - Remove the absent `src-tauri` directory from workspace membership; do not
@@ -118,7 +119,7 @@ The following are source-level findings from the current `main` tree:
 - Add smoke tests for initialization, command discovery, workspace open and
   document outline when a Rust build environment is available.
 
-### Phase B — stable Java client and workspace identity
+### Phase B — stable Java client and workspace identity (implemented; verification pending)
 
 - Add a standalone `cifr-ide-client` Java module using the existing protocol
   version 2.
@@ -132,17 +133,14 @@ The following are source-level findings from the current `main` tree:
 - Keep the client independent of CDI/Quarkus; add a CDI lifecycle adapter in
   the consuming module.
 
-### Phase C — replace the Muqabalah integration safely
+### Phase C — retire Muqabalah and finish IDE integration
 
-- Migrate symbol resolution to `doc_open` + `doc_outline`.
+- Symbol and reference resolution now use CIFR IDE LSP workspace-symbol/reference operations; the lightweight parser remains the fallback.
 - Correct CIFR's symbol cache and make reference requests resolve a real
   `SymbolInfo` location before invoking `lsp_references`.
 - Carry workspace root and workspace/session identity explicitly through
   indexing and tool execution; do not infer it from a process-global setting.
-- Remove the Muqabalah Maven dependency only after an exhaustive source and
-  test audit confirms no remaining imports or runtime references.
-- Remove the Muqabalah default MCP endpoint after the Rust IDE or a deliberate
-  external MCP server adapter replaces it.
+- The direct Maven dependencies and implicit MCP endpoint have been removed from the integration branch. The retired `MockCodeTool` test fixture was replaced with tests at the CIFR IDE boundary; all 46 remaining Java test files were checked for Muqabalah references. Complete the production-source audit and run the Maven reactor before merging; do not restore an implicit service dependency.
 
 ### Phase D — unify repository intelligence without losing CIFR semantics
 

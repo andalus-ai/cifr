@@ -12,13 +12,14 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 @ApplicationScoped
 public class DefaultFileIndex implements FileIndex {
 
-    private final Map<Path, FileRecord> fileRecords = new ConcurrentHashMap<>();
+    private final Map<String, FileRecord> fileRecords = new ConcurrentHashMap<>();
 
     @Inject
     FileClassifier classifier;
@@ -68,14 +69,44 @@ public class DefaultFileIndex implements FileIndex {
 
     @Override
     public Uni<List<FileRecord>> getCurrentIndex(String workspaceId) {
-        return Uni.createFrom().item(new ArrayList<>(fileRecords.values()));
+        return Uni.createFrom().item(fileRecords.values().stream()
+                .filter(record -> workspaceId == null || workspaceId.equals(record.workspaceId()))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
     }
 
     @Override
     public void registerFile(FileRecord record) {
         if (record != null && record.path() != null) {
-            fileRecords.put(record.path(), record);
+            fileRecords.put(record.workspaceId() + "|" + record.path().normalize(), record);
         }
+    }
+
+    @Override
+    public void removeFile(Path file, String workspaceId) {
+        if (file == null || workspaceId == null || workspaceId.isBlank()) return;
+        Path normalized = file.normalize();
+        fileRecords.entrySet().removeIf(entry -> {
+            FileRecord record = entry.getValue();
+            if (!workspaceId.equals(record.workspaceId()) || record.path() == null) return false;
+            Path indexed = record.path().normalize();
+            return indexed.equals(normalized);
+        });
+    }
+
+    @Override
+    public List<Path> removeMissingFiles(String workspaceId, Set<Path> presentFiles) {
+        if (workspaceId == null || workspaceId.isBlank()) return List.of();
+        Set<Path> present = presentFiles == null ? Set.of() : presentFiles;
+        List<Path> removed = new ArrayList<>();
+        fileRecords.entrySet().removeIf(entry -> {
+            FileRecord record = entry.getValue();
+            if (!workspaceId.equals(record.workspaceId()) || record.path() == null) return false;
+            Path path = record.path().normalize();
+            if (present.contains(path)) return false;
+            removed.add(path);
+            return true;
+        });
+        return removed;
     }
 
     @Override

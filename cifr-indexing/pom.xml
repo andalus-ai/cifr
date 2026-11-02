@@ -27,13 +27,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Muqabala remains temporarily for consumers not migrated in this PR. -->
-        <dependency>
-            <groupId>tech.kayys.muqabala</groupId>
-            <artifactId>muqabala</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-
         <!-- SmallRye Mutiny Reactive -->
         <dependency>
             <groupId>io.smallrye.reactive</groupId>

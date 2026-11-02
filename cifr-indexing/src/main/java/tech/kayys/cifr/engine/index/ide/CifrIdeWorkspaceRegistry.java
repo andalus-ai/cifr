@@ -29,20 +29,27 @@ public class CifrIdeWorkspaceRegistry {
         if (root == null || !root.toAbsolutePath().normalize().toFile().isDirectory()) {
             throw new IllegalArgumentException("workspace root must be an existing directory");
         }
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        Session existing = sessions.get(workspaceId);
+        if (existing != null && existing.root().equals(normalizedRoot)) return;
         closeWorkspace(workspaceId);
         List<String> command = configuredCommand();
-        CifrIdeClient client = CifrIdeClient.start(command, root, Duration.ofSeconds(30), null);
+        CifrIdeClient client = CifrIdeClient.start(command, normalizedRoot, Duration.ofSeconds(30), null);
         try {
             JsonNode project = client.invoke(workspaceId, "open_project",
                     Map.of("path", root.toAbsolutePath().normalize().toString()));
             if (project == null || project.isNull()) {
                 throw new IOException("CIFR IDE did not return project information for " + workspaceId);
             }
-            sessions.put(workspaceId, new Session(root.toAbsolutePath().normalize(), client));
+            sessions.put(workspaceId, new Session(normalizedRoot, client));
         } catch (IOException | InterruptedException | TimeoutException | RuntimeException e) {
             client.close();
             throw e;
         }
+    }
+
+    public boolean isOpen(String workspaceId) {
+        return workspaceId != null && sessions.containsKey(workspaceId);
     }
 
     public Session require(String workspaceId) {
@@ -54,6 +61,7 @@ public class CifrIdeWorkspaceRegistry {
     }
 
     public synchronized void closeWorkspace(String workspaceId) {
+        if (workspaceId == null || workspaceId.isBlank()) return;
         Session session = sessions.remove(workspaceId);
         if (session == null) return;
         try {

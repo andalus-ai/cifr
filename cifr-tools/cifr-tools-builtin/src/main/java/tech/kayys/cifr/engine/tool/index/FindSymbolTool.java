@@ -43,7 +43,7 @@ public class FindSymbolTool implements CifrTool {
         String signature = (String) request.arguments().get("name"); // mapping name to signature for now as simple fallback
         SymbolId target = new SymbolId(fqn, signature, null);
         
-        return intelligence.symbol(target).map(info -> {
+        return intelligence.symbol(target, context.workspaceId()).map(info -> {
             if (info == null) {
                 return new SimpleToolResult(true, "Symbol not found.");
             }

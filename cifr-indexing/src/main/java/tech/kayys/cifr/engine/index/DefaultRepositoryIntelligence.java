@@ -50,6 +50,12 @@ public class DefaultRepositoryIntelligence implements RepositoryIntelligence {
     public Uni<tech.kayys.cifr.engine.index.symbol.SymbolInfo> symbol(tech.kayys.cifr.engine.index.symbol.SymbolId id) {
         return symbolIndex.getSymbol(id);
     }
+
+    @Override
+    public Uni<tech.kayys.cifr.engine.index.symbol.SymbolInfo> symbol(
+            tech.kayys.cifr.engine.index.symbol.SymbolId id, String workspaceId) {
+        return symbolIndex.getSymbol(id, workspaceId);
+    }
     
     @Inject
     tech.kayys.cifr.engine.index.reference.ReferenceIndex referenceIndex;

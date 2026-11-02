@@ -34,20 +34,21 @@ public class DefaultSymbolIndex implements SymbolIndex {
         }
         String key = fileKey(workspaceId, file);
         List<SymbolInfo> cached = symbolsByFile.get(key);
-        if (cached != null && !cached.isEmpty()) {
-            return Uni.createFrom().item(new ArrayList<>(cached));
-        }
         if (fileIndex == null || symbolResolver == null) {
-            return Uni.createFrom().item(List.of());
+            return Uni.createFrom().item(cached == null ? List.of() : new ArrayList<>(cached));
         }
         return fileIndex.getCurrentIndex(workspaceId).onItem().transformToUni(records -> {
             FileRecord record = records.stream()
                     .filter(r -> samePath(r.path(), file))
                     .findFirst().orElse(null);
             if (record == null || !symbolResolver.supports(record)) {
-                return Uni.createFrom().item(List.of());
+                return Uni.createFrom().item(cached == null ? List.of() : new ArrayList<>(cached));
             }
-            return symbolResolver.resolve(record).onItem().invoke(found -> found.forEach(this::registerSymbol));
+            return symbolResolver.resolve(record).onItem().invoke(found -> {
+                if (found != null) found.forEach(this::registerSymbol);
+            }).onItem().transform(found -> found == null || found.isEmpty()
+                    ? (cached == null ? List.of() : new ArrayList<>(cached))
+                    : found);
         });
     }
 
@@ -79,6 +80,20 @@ public class DefaultSymbolIndex implements SymbolIndex {
     }
 
     @Override
+    public Uni<SymbolInfo> getSymbol(SymbolId id, String workspaceId) {
+        if (id == null) return Uni.createFrom().nullItem();
+        SymbolInfo info = symbolsById.values().stream()
+                .filter(s -> workspaceId == null || workspaceId.equals(s.workspaceId()))
+                .filter(s -> s.id() != null && s.id().equals(id))
+                .findFirst().orElseGet(() -> symbolsById.values().stream()
+                        .filter(s -> workspaceId == null || workspaceId.equals(s.workspaceId()))
+                        .filter(s -> s.name().equalsIgnoreCase(id.qualifiedName())
+                                || (s.id() != null && s.id().qualifiedName().equalsIgnoreCase(id.qualifiedName())))
+                        .findFirst().orElse(null));
+        return Uni.createFrom().item(info);
+    }
+
+    @Override
     public void registerSymbol(SymbolInfo info) {
         if (info == null) return;
         String qualified = info.id() == null ? info.name() : info.id().qualifiedName();
@@ -89,6 +104,28 @@ public class DefaultSymbolIndex implements SymbolIndex {
                     symbolsByFile.computeIfAbsent(fileKey(info.workspaceId(), info.file()), ignored -> new CopyOnWriteArrayList<>());
             if (previous != null) fileSymbols.remove(previous);
             fileSymbols.addIfAbsent(info);
+        }
+    }
+
+    @Override
+    public void removeFile(Path file, String workspaceId) {
+        if (file == null || workspaceId == null || workspaceId.isBlank()) return;
+        Path normalized = file.normalize();
+        List<String> matchingKeys = symbolsByFile.keySet().stream()
+                .filter(key -> key.startsWith(workspaceId + "|"))
+                .filter(key -> {
+                    String indexedPath = key.substring(workspaceId.length() + 1);
+                    Path indexed = Path.of(indexedPath).normalize();
+                    return indexed.equals(normalized);
+                })
+                .toList();
+        for (String key : matchingKeys) {
+            List<SymbolInfo> removed = symbolsByFile.remove(key);
+            if (removed == null) continue;
+            for (SymbolInfo symbol : removed) {
+                String qualified = symbol.id() == null ? symbol.name() : symbol.id().qualifiedName();
+                symbolsById.remove(workspaceId + "|" + symbol.file() + "|" + qualified, symbol);
+            }
         }
     }
 
@@ -105,6 +142,11 @@ public class DefaultSymbolIndex implements SymbolIndex {
         symbolsByFile.entrySet().removeIf(entry -> entry.getKey().startsWith(workspaceId + "|"));
     }
 
+    @Override
+    public void invalidateResolverCache(String workspaceId) {
+        if (symbolResolver != null) symbolResolver.invalidateWorkspace(workspaceId);
+    }
+
     private static String fileKey(String workspaceId, Path file) {
         return workspaceId + "|" + file.normalize();
     }
@@ -113,6 +155,6 @@ public class DefaultSymbolIndex implements SymbolIndex {
         if (left == null || right == null) return false;
         Path a = left.normalize();
         Path b = right.normalize();
-        return a.equals(b) || a.endsWith(b) || b.endsWith(a);
+        return a.equals(b);
     }
 }

@@ -9,4 +9,7 @@ public interface SymbolResolver {
     boolean supports(FileRecord record);
     
     Uni<List<SymbolInfo>> resolve(FileRecord record);
+
+    /** Invalidates workspace-level IDE symbol snapshots after an index update. */
+    default void invalidateWorkspace(String workspaceId) { }
 }

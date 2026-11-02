@@ -15,13 +15,15 @@ public class DefaultDependencyIndex implements DependencyIndex {
 
     @Override
     public Uni<List<Dependency>> getDependencies(DependencyRequest request) {
-        if (request == null || request.sourceIdentifier() == null) {
+        if (request == null) {
             return Uni.createFrom().item(new ArrayList<>(dependencies));
         }
 
-        String source = request.sourceIdentifier();
         List<Dependency> filtered = dependencies.stream()
-            .filter(d -> d.source() != null && d.source().contains(source))
+            .filter(d -> request.sourceIdentifier() == null
+                    || (d.source() != null && d.source().contains(request.sourceIdentifier())))
+            .filter(d -> request.workspaceId() == null || request.workspaceId().equals(d.workspaceId()))
+            .filter(d -> request.targetKindFilter() == null || request.targetKindFilter() == d.kind())
             .collect(Collectors.toList());
 
         return Uni.createFrom().item(filtered);
@@ -32,6 +34,13 @@ public class DefaultDependencyIndex implements DependencyIndex {
         if (dependency != null) {
             dependencies.add(dependency);
         }
+    }
+
+    @Override
+    public void removeFile(String source, String workspaceId) {
+        if (source == null || workspaceId == null || workspaceId.isBlank()) return;
+        dependencies.removeIf(dependency -> workspaceId.equals(dependency.workspaceId())
+                && source.equals(dependency.source()));
     }
 
     @Override

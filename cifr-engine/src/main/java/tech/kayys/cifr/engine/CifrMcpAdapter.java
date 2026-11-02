@@ -59,22 +59,12 @@ public class CifrMcpAdapter {
                 }
             }
 
-            String muqabalaEnv = System.getenv("MUQABALAH_MCP_ENDPOINT");
-            if (muqabalaEnv == null || muqabalaEnv.isBlank()) {
-                muqabalaEnv = System.getProperty("muqabala.mcp.endpoint");
-            }
-            if (muqabalaEnv == null || muqabalaEnv.isBlank()) {
-                muqabalaEnv = "http://localhost:8080/mcp/sse";
-            }
-
-            if (configPath == null && muqabalaEnv.isBlank()) {
+            if (configPath == null) {
                 return tools;
             }
 
             HttpMcpToolDiscoveryClient discoveryClient = new HttpMcpToolDiscoveryClient();
             HttpMcpToolClient mcpClient = new HttpMcpToolClient();
-
-            boolean muqabalaFound = false;
 
             if (configPath != null) {
                 JsonNode root = MAPPER.readTree(configPath.toFile());
@@ -117,36 +107,10 @@ public class CifrMcpAdapter {
                                     + e.getMessage());
                         }
                     });
-
-                    if (servers.has("muqabala")) {
-                        muqabalaFound = true;
-                    }
+ 
                 }
             }
 
-            if (!muqabalaFound && muqabalaEnv != null && !muqabalaEnv.isBlank()) {
-                String serverName = "muqabala";
-                String endpoint = muqabalaEnv;
-                Map<String, Object> context = new HashMap<>();
-                context.put("mcpEndpoint", endpoint);
-
-                McpToolDiscoveryRequest request = new McpToolDiscoveryRequest(serverName, endpoint, context);
-                try {
-                    McpToolDiscoveryResult result = discoveryClient.discoverTools(request).await().indefinitely();
-                    if (result.success() && result.tools() != null) {
-                        for (McpDiscoveredTool dt : result.tools()) {
-                            tools.add(new McpTool(dt.id(), dt.name(), dt.description(), dt.inputSchema(), context,
-                                    mcpClient));
-                        }
-                    } else {
-                        System.err.println("[CifrMcpAdapter] Failed to discover MCP tools for server " + serverName
-                                + ": " + result.error());
-                    }
-                } catch (Exception e) {
-                    System.err.println(
-                            "[CifrMcpAdapter] Error discovering MCP tools for " + serverName + ": " + e.getMessage());
-                }
-            }
 
         } catch (Exception e) {
             System.err.println("[CifrMcpAdapter] Failed to load MCP config: " + e.getMessage());
