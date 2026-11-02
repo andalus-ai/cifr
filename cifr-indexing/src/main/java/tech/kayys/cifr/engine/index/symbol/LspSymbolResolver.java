@@ -1,78 +1,86 @@
 package tech.kayys.cifr.engine.index.symbol;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import tech.kayys.cifr.engine.index.FileRecord;
-import tech.kayys.muqabala.api.CodeTool;
-import tech.kayys.muqabala.language.LanguageTypes.SymbolEntry;
+import tech.kayys.cifr.engine.index.ide.CifrIdeWorkspaceRegistry;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
+/** Resolves symbols from the workspace index owned by CIFR IDE. */
 @ApplicationScoped
 public class LspSymbolResolver implements SymbolResolver {
+    private static final int MAX_SYMBOLS = 2_000;
 
-    @Inject
-    CodeTool codeTool;
+    @Inject CifrIdeWorkspaceRegistry workspaces;
 
     @Override
     public boolean supports(FileRecord record) {
-        return true;
+        return record != null && record.path() != null
+                && record.workspaceId() != null && !record.workspaceId().isBlank();
     }
 
     @Override
     public Uni<List<SymbolInfo>> resolve(FileRecord record) {
-        return codeTool.documentSymbols(record.workspaceId(), record.path())
-                .map(entries -> {
-                    List<SymbolInfo> symbols = new ArrayList<>();
-                    if (entries != null) {
-                        for (SymbolEntry entry : entries) {
-                            processSymbolEntry(entry, record, null, symbols);
-                        }
-                    }
-                    return symbols;
-                })
-                .onFailure().recoverWithItem(new ArrayList<>());
+        return Uni.createFrom().item(() -> resolveFromIde(record));
     }
 
-    private void processSymbolEntry(SymbolEntry entry, FileRecord record, SymbolId parentId, List<SymbolInfo> symbols) {
-        SymbolKind kind = mapKindString(entry.kind());
-        String name = entry.name();
-        String qualified = parentId != null ? parentId.qualifiedName() + "." + name : name;
-        if (parentId == null && entry.containerName() != null && !entry.containerName().isBlank()) {
-            qualified = entry.containerName() + "." + name;
-        }
-
-        SymbolId id = new SymbolId(qualified, name, "hash");
-        SourceRange range = new SourceRange(
-                entry.range().start().line() + 1,
-                entry.range().end().line() + 1,
-                entry.range().start().character() + 1,
-                entry.range().end().character() + 1);
-
-        SymbolInfo info = new SymbolInfo(id, name, kind, record.path(), range, Optional.ofNullable(parentId));
-        symbols.add(info);
-
-        if (entry.children() != null) {
-            for (SymbolEntry child : entry.children()) {
-                processSymbolEntry(child, record, id, symbols);
+    private List<SymbolInfo> resolveFromIde(FileRecord record) {
+        try {
+            var session = workspaces.require(record.workspaceId());
+            JsonNode response = session.client().invoke(record.workspaceId(), "find_symbols",
+                    java.util.Map.of("query", "", "filter", "all", "limit", MAX_SYMBOLS));
+            List<SymbolInfo> symbols = new ArrayList<>();
+            if (response == null || !response.isArray()) return symbols;
+            for (JsonNode entry : response) {
+                String relativePath = entry.path("relPath").asText("");
+                if (!samePath(relativePath, record.path().toString())) continue;
+                String name = entry.path("name").asText("");
+                if (name.isBlank()) continue;
+                String container = entry.path("container").isNull() ? null : entry.path("container").asText(null);
+                String qualifiedName = container == null || container.isBlank() ? name : container + "." + name;
+                JsonNode range = entry.path("range");
+                JsonNode start = range.path("start");
+                JsonNode end = range.path("end");
+                if (!start.has("line") || !start.has("character") || !end.has("line") || !end.has("character")) {
+                    continue;
+                }
+                SourceRange sourceRange = new SourceRange(
+                        start.path("line").asInt() + 1,
+                        end.path("line").asInt() + 1,
+                        start.path("character").asInt() + 1,
+                        end.path("character").asInt() + 1);
+                SymbolId id = new SymbolId(qualifiedName, container == null ? "" : container, record.contentHash());
+                symbols.add(new SymbolInfo(id, name, mapKind(entry.path("kind").asText("")),
+                        record.path(), sourceRange, Optional.empty(), record.workspaceId()));
             }
+            return symbols;
+        } catch (IOException | InterruptedException | TimeoutException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("CIFR IDE symbol lookup failed for workspace "
+                    + record.workspaceId() + " and file " + record.path(), e);
         }
     }
 
-    private SymbolKind mapKindString(String kindString) {
-        if (kindString == null) return SymbolKind.VARIABLE;
-        return switch (kindString.toLowerCase()) {
-            case "class" -> SymbolKind.CLASS;
+    private static boolean samePath(String left, String right) {
+        return left.replace('\\', '/').equals(right.replace('\\', '/'));
+    }
+
+    private static SymbolKind mapKind(String value) {
+        return switch (value.toLowerCase()) {
+            case "class", "struct", "trait", "type" -> SymbolKind.CLASS;
             case "interface" -> SymbolKind.INTERFACE;
             case "enum" -> SymbolKind.ENUM;
             case "method" -> SymbolKind.METHOD;
             case "function" -> SymbolKind.FUNCTION;
             case "field" -> SymbolKind.FIELD;
             case "property" -> SymbolKind.PROPERTY;
-            case "variable" -> SymbolKind.VARIABLE;
             case "constructor" -> SymbolKind.CONSTRUCTOR;
             case "module", "namespace", "package" -> SymbolKind.MODULE;
             default -> SymbolKind.VARIABLE;
