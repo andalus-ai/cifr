@@ -127,6 +127,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     public Uni<Void> removeFile(Path file, String workspaceId) {
         return Uni.createFrom().item(() -> {
             if (symbolIndex != null) symbolIndex.invalidateResolverCache(workspaceId);
+            return null;
         });
     }
 
