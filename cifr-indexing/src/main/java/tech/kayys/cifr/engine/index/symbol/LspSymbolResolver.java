@@ -23,7 +23,8 @@ public class LspSymbolResolver implements SymbolResolver {
     @Override
     public boolean supports(FileRecord record) {
         return record != null && record.path() != null
-                && record.workspaceId() != null && !record.workspaceId().isBlank();
+                && record.workspaceId() != null && !record.workspaceId().isBlank()
+                && workspaces != null && workspaces.isOpen(record.workspaceId());
     }
 
     @Override
