@@ -29,4 +29,6 @@ public interface SymbolIndex {
     default void clearWorkspace(String workspaceId) {
         clear();
     }
+
+    default void invalidateResolverCache(String workspaceId) { }
 }
