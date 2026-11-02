@@ -35,6 +35,13 @@ public class DefaultDependencyIndex implements DependencyIndex {
     }
 
     @Override
+    public void removeFile(String source, String workspaceId) {
+        if (source == null || workspaceId == null || workspaceId.isBlank()) return;
+        dependencies.removeIf(dependency -> workspaceId.equals(dependency.workspaceId())
+                && source.equals(dependency.source()));
+    }
+
+    @Override
     public void clear() {
         dependencies.clear();
     }
