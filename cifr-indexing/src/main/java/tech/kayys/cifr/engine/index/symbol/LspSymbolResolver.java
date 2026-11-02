@@ -15,11 +15,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Resolves symbols from the workspace index owned by CIFR IDE. */
 @ApplicationScoped
 public class LspSymbolResolver implements SymbolResolver {
-    private static final int MAX_SYMBOLS = 2_000;
+    private static final AtomicInteger REQUEST_IDS = new AtomicInteger(1);
     private final Map<String, List<SymbolInfo>> workspaceSnapshots = new ConcurrentHashMap<>();
 
     @Inject CifrIdeWorkspaceRegistry workspaces;
@@ -56,19 +57,18 @@ public class LspSymbolResolver implements SymbolResolver {
     private List<SymbolInfo> loadWorkspaceSymbols(FileRecord record) {
         try {
             var session = workspaces.require(record.workspaceId());
-            JsonNode status = session.client().invoke(record.workspaceId(), "index_status", java.util.Map.of());
-            if (status.path("indexing").asBoolean(false)) return symbols;
-            JsonNode response = session.client().invoke(record.workspaceId(), "find_symbols",
-                    java.util.Map.of("query", "", "filter", "all", "limit", MAX_SYMBOLS));
+            JsonNode response = session.client().invoke(record.workspaceId(), "lsp_workspace_symbols",
+                    java.util.Map.of("request", REQUEST_IDS.getAndIncrement(), "query", ""));
             List<SymbolInfo> symbols = new ArrayList<>();
             if (response == null || !response.isArray()) return symbols;
             for (JsonNode entry : response) {
-                String relativePath = entry.path("relPath").asText("");
+                JsonNode location = entry.path("location");
+                String relativePath = location.path("path").asText("");
                 String name = entry.path("name").asText("");
                 if (relativePath.isBlank() || name.isBlank()) continue;
                 String container = entry.path("container").isNull() ? null : entry.path("container").asText(null);
                 String qualifiedName = container == null || container.isBlank() ? name : container + "." + name;
-                JsonNode range = entry.path("range");
+                JsonNode range = location.path("range");
                 JsonNode start = range.path("start");
                 JsonNode end = range.path("end");
                 if (!start.has("line") || !start.has("character") || !end.has("line") || !end.has("character")) continue;
