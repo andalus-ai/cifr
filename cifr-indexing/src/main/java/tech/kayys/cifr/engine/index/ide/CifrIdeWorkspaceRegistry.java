@@ -29,6 +29,9 @@ public class CifrIdeWorkspaceRegistry {
         if (root == null || !root.toAbsolutePath().normalize().toFile().isDirectory()) {
             throw new IllegalArgumentException("workspace root must be an existing directory");
         }
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        Session existing = sessions.get(workspaceId);
+        if (existing != null && existing.root().equals(normalizedRoot)) return;
         closeWorkspace(workspaceId);
         List<String> command = configuredCommand();
         CifrIdeClient client = CifrIdeClient.start(command, root, Duration.ofSeconds(30), null);
@@ -38,7 +41,7 @@ public class CifrIdeWorkspaceRegistry {
             if (project == null || project.isNull()) {
                 throw new IOException("CIFR IDE did not return project information for " + workspaceId);
             }
-            sessions.put(workspaceId, new Session(root.toAbsolutePath().normalize(), client));
+            sessions.put(workspaceId, new Session(normalizedRoot, client));
         } catch (IOException | InterruptedException | TimeoutException | RuntimeException e) {
             client.close();
             throw e;
