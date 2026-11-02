@@ -73,6 +73,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
             Path root = workspaceRoot != null ? workspaceRoot.toAbsolutePath().normalize() : Path.of(".").toAbsolutePath().normalize();
             String effectiveWorkspaceId = workspaceId == null || workspaceId.isBlank() ? "default-workspace" : workspaceId;
             ensureIdeSession(root, effectiveWorkspaceId);
+            if (symbolIndex != null) symbolIndex.invalidateResolverCache(effectiveWorkspaceId);
 
             AtomicInteger filesCount = new AtomicInteger(0);
             AtomicInteger symbolsCount = new AtomicInteger(0);
@@ -110,6 +111,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
             Path root = workspaceRoot != null ? workspaceRoot.toAbsolutePath().normalize() : Path.of(".").toAbsolutePath().normalize();
             String effectiveWorkspaceId = workspaceId == null || workspaceId.isBlank() ? "default-workspace" : workspaceId;
             ensureIdeSession(root, effectiveWorkspaceId);
+            if (symbolIndex != null) symbolIndex.invalidateResolverCache(effectiveWorkspaceId);
             Path relative = root.relativize(root.resolve(file).normalize());
 
             AtomicInteger filesCount = new AtomicInteger(0);
@@ -124,7 +126,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     @Override
     public Uni<Void> removeFile(Path file, String workspaceId) {
         return Uni.createFrom().item(() -> {
-            return null;
+            if (symbolIndex != null) symbolIndex.invalidateResolverCache(workspaceId);
         });
     }
 
