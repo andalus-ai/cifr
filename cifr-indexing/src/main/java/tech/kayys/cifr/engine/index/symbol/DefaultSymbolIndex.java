@@ -29,24 +29,13 @@ public class DefaultSymbolIndex implements SymbolIndex {
 
     @Override
     public Uni<List<SymbolInfo>> getSymbols(Path file, String workspaceId) {
-        if (file == null || workspaceId == null || workspaceId.isBlank()) {
-            return Uni.createFrom().item(List.of());
-        }
-        String key = fileKey(workspaceId, file);
-        List<SymbolInfo> cached = symbolsByFile.get(key);
-        if (cached != null && !cached.isEmpty()) {
-            return Uni.createFrom().item(new ArrayList<>(cached));
-        }
-        if (fileIndex == null || symbolResolver == null) {
-            return Uni.createFrom().item(List.of());
-        }
+        if (file == null || workspaceId == null || workspaceId.isBlank()) return Uni.createFrom().item(List.of());
+        List<SymbolInfo> cached = symbolsByFile.get(fileKey(workspaceId, file));
+        if (cached != null && !cached.isEmpty()) return Uni.createFrom().item(new ArrayList<>(cached));
+        if (fileIndex == null || symbolResolver == null) return Uni.createFrom().item(List.of());
         return fileIndex.getCurrentIndex(workspaceId).onItem().transformToUni(records -> {
-            FileRecord record = records.stream()
-                    .filter(r -> samePath(r.path(), file))
-                    .findFirst().orElse(null);
-            if (record == null || !symbolResolver.supports(record)) {
-                return Uni.createFrom().item(List.of());
-            }
+            FileRecord record = records.stream().filter(r -> samePath(r.path(), file)).findFirst().orElse(null);
+            if (record == null || !symbolResolver.supports(record)) return Uni.createFrom().item(List.of());
             return symbolResolver.resolve(record).onItem().invoke(found -> found.forEach(this::registerSymbol));
         });
     }
@@ -68,14 +57,24 @@ public class DefaultSymbolIndex implements SymbolIndex {
 
     @Override
     public Uni<SymbolInfo> getSymbol(SymbolId id) {
+        return findSymbol(id, null);
+    }
+
+    @Override
+    public Uni<SymbolInfo> getSymbol(SymbolId id, String workspaceId) {
+        return findSymbol(id, workspaceId == null || workspaceId.isBlank() ? null : workspaceId);
+    }
+
+    private Uni<SymbolInfo> findSymbol(SymbolId id, String workspaceId) {
         if (id == null) return Uni.createFrom().nullItem();
-        SymbolInfo info = symbolsById.values().stream()
-                .filter(s -> s.id() != null && s.id().equals(id))
-                .findFirst().orElseGet(() -> symbolsById.values().stream()
-                        .filter(s -> s.name().equalsIgnoreCase(id.qualifiedName())
-                                || (s.id() != null && s.id().qualifiedName().equalsIgnoreCase(id.qualifiedName())))
-                        .findFirst().orElse(null));
-        return Uni.createFrom().item(info);
+        List<SymbolInfo> matches = symbolsById.values().stream()
+                .filter(s -> workspaceId == null || workspaceId.equals(s.workspaceId()))
+                .filter(s -> s.id() != null && (s.id().equals(id)
+                        || s.name().equalsIgnoreCase(id.qualifiedName())
+                        || s.id().qualifiedName().equalsIgnoreCase(id.qualifiedName())))
+                .toList();
+        // Never choose an arbitrary project's symbol for an unscoped ambiguous name.
+        return Uni.createFrom().item(matches.size() == 1 ? matches.get(0) : null);
     }
 
     @Override
@@ -85,10 +84,10 @@ public class DefaultSymbolIndex implements SymbolIndex {
         String key = info.workspaceId() + "|" + (info.file() == null ? "" : info.file()) + "|" + qualified;
         SymbolInfo previous = symbolsById.put(key, info);
         if (info.file() != null) {
-            CopyOnWriteArrayList<SymbolInfo> fileSymbols =
+            CopyOnWriteArrayList<SymbolInfo> values =
                     symbolsByFile.computeIfAbsent(fileKey(info.workspaceId(), info.file()), ignored -> new CopyOnWriteArrayList<>());
-            if (previous != null) fileSymbols.remove(previous);
-            fileSymbols.addIfAbsent(info);
+            if (previous != null) values.remove(previous);
+            values.addIfAbsent(info);
         }
     }
 

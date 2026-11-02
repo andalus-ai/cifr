@@ -1,7 +1,6 @@
 # CIFR and CIFR IDE integration
 
-**Status:** integration foundation; Java-to-Rust client and resolver migration
-remain follow-up implementation work.
+**Status:** protocol-v2 Java client and workspace-scoped symbol/reference migration are now implemented on the integration branch; full runtime lifecycle and tool-context propagation remain follow-up work.
 
 ## 1. Target ownership
 
@@ -39,11 +38,12 @@ and UTF-16 column. The Java adapter must convert CIFR's one-based
 `SourceRange` values at the boundary. Workspace/window identity must be
 stable for a single host session; never use a magic `default-workspace` ID.
 
-The first Java client should be a small, version-aware stdio client around this
-existing protocol. It should not speak LSP directly, depend on MCP-specific
-semantics, or create an independent document/index cache. A later MCP adapter
-may expose selected IDE operations to external agents, but MCP is an adapter,
-not the internal domain model.
+The `cifr-ide-client` module implements the protocol-v2 stdio transport. It
+starts the host process directly (without a shell), negotiates the protocol,
+frames UTF-8 JSON by byte length, and exposes command invocation. It should not
+speak LSP directly, depend on MCP-specific semantics, or create an independent
+document/index cache. A later MCP adapter may expose selected IDE operations
+to external agents, but MCP is an adapter, not the internal domain model.
 
 ## 3. Existing CIFR capabilities to preserve
 
@@ -72,23 +72,19 @@ the latter in CIFR.
 
 ## 4. Confirmed integration defects to address
 
-The following are source-level findings from the current `main` tree:
+The following are source-level findings and migration updates from the current integration branch:
 
-1. `cifr-indexing/pom.xml` directly depends on
-   `tech.kayys.muqabala:muqabala:1.0.0-SNAPSHOT`.
-2. `LspSymbolResolver` and `LspReferenceResolver` use Muqabalah's
-   `CodeTool`. Both hard-code `default-workspace`; reference resolution
-   additionally queries the placeholder position (line 1, character 1).
-   Both convert failures into empty results, making service failures look
-   like "no symbols/references".
-3. `DefaultReferenceIndex` currently ignores its request when constructing
-   the source record: it creates a mock `test.java` record. Its own comment
-   labels this a mock implementation. This must be corrected before
-   reference resolution can be considered integrated.
-4. `DefaultSymbolIndex.getSymbols` constructs a mock record with language
-   `java`; the returned list is not registered into its in-memory
-   `symbolsById` / `symbolsByFile` maps on that path. This undermines
-   subsequent symbol lookup.
+1. The indexing module's Muqabalah dependency is removed after moving its
+   remaining reference lookup to the CIFR IDE host. The engine-level Muqabalah
+   MCP endpoint/configuration is still a separate migration concern.
+2. `LspSymbolResolver` now uses the CIFR IDE workspace index. Reference
+   resolution has been migrated to `doc_open` + `lsp_references`, using the
+   actual indexed symbol range and preserving transport errors.
+3. `DefaultReferenceIndex` now resolves the requested `SymbolInfo`, finds
+   its file record in the owning workspace, and delegates to the IDE resolver.
+4. `DefaultFileIndex` now keys relative file paths by workspace ID,
+   `DefaultSymbolIndex` supports workspace-scoped symbol lookup, and
+   `DefaultWorkspaceIndexer` carries the workspace ID into extracted symbols.
 5. `CifrToolAdapter` creates a synthetic `workspace-default` ID and uses
    `WorkspaceResolver`'s static ThreadLocal to pass workspace state around a
    Mutiny execution. ThreadLocal state is not a safe async context propagation
@@ -110,37 +106,37 @@ The following are source-level findings from the current `main` tree:
 
 ### Phase A — make the headless IDE host buildable
 
-- Keep the Rust crates under `cifr-ide/crates/*`.
-- Remove the absent `src-tauri` directory from workspace membership; do not
+- [x] Keep the Rust crates under `cifr-ide/crates/*`.
+- [x] Remove the absent `src-tauri` directory from workspace membership; do not
   create an empty Tauri shell.
-- Provide the declared `cifridea-server --stdio` entry point.
-- Keep logs on stderr and preserve JSON-RPC framing on stdout.
+- [x] Provide the declared `cifridea-server --stdio` entry point.
+- [x] Keep logs on stderr and preserve JSON-RPC framing on stdout.
 - Add smoke tests for initialization, command discovery, workspace open and
   document outline when a Rust build environment is available.
 
-### Phase B — stable Java client and workspace identity
+### Phase B — stable Java client and workspace identity (partially complete)
 
-- Add a standalone `cifr-ide-client` Java module using the existing protocol
-  version 2.
-- Configure the executable path explicitly (system property/environment),
+- [x] Add a standalone `cifr-ide-client` Java module using protocol version 2.
+- [x] Configure the executable path through `CIFR_IDE_SERVER_COMMAND`,
   with a clear startup error if unavailable.
-- Keep one managed IDE host session per workspace root, with deterministic
+- [x] Keep one managed IDE host session per workspace root, with deterministic
   window identity and explicit lifecycle/close behavior.
-- Negotiate protocol version and check required commands before use.
-- Propagate timeouts, cancellation and structured server errors. Never
-  recover infrastructure errors as empty result lists.
+- [x] Negotiate protocol version and query the host command catalogue.
+- [x] Propagate request timeouts and server errors; do not translate IDE
+  transport failures into empty reference results.
 - Keep the client independent of CDI/Quarkus; add a CDI lifecycle adapter in
   the consuming module.
 
 ### Phase C — replace the Muqabalah integration safely
 
-- Migrate symbol resolution to `doc_open` + `doc_outline`.
-- Correct CIFR's symbol cache and make reference requests resolve a real
-  `SymbolInfo` location before invoking `lsp_references`.
-- Carry workspace root and workspace/session identity explicitly through
-  indexing and tool execution; do not infer it from a process-global setting.
-- Remove the Muqabalah Maven dependency only after an exhaustive source and
-  test audit confirms no remaining imports or runtime references.
+- [x] Move symbol resolution to the CIFR IDE host's workspace symbol index.
+- [x] Resolve reference requests to a real `SymbolInfo` definition range before
+  invoking `lsp_references`.
+- [x] Carry workspace identity through file indexing, symbol indexing, and
+  reference queries. Tool execution still needs explicit async context propagation.
+- [x] Remove the Muqabalah Maven dependency from `cifr-indexing` after moving
+  its LSP reference resolver. Keep the engine-level dependency until its
+  remaining runtime/configuration consumers are audited.
 - Remove the Muqabalah default MCP endpoint after the Rust IDE or a deliberate
   external MCP server adapter replaces it.
 

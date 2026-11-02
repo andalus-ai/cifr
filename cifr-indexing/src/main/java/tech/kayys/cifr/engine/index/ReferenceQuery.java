@@ -2,19 +2,21 @@ package tech.kayys.cifr.engine.index;
 
 import tech.kayys.cifr.engine.index.reference.ReferenceKind;
 
-/**
- * Query object for reference lookups (callers, callees, usages, implementations).
- */
-public record ReferenceQuery(
-    String symbolId,
-    ReferenceKind kind,
-    int limit
-) {
+/** Query object for reference lookups (callers, callees, usages, implementations). */
+public record ReferenceQuery(String symbolId, ReferenceKind kind, int limit, String workspaceId) {
+    public ReferenceQuery(String symbolId, ReferenceKind kind, int limit) {
+        this(symbolId, kind, limit, null);
+    }
+
     public static ReferenceQuery callers(String symbolId) {
-        return new ReferenceQuery(symbolId, ReferenceKind.CALL, 50);
+        return new ReferenceQuery(symbolId, ReferenceKind.CALL, 50, null);
     }
 
     public static ReferenceQuery usages(String symbolId) {
-        return new ReferenceQuery(symbolId, ReferenceKind.USAGE, 50);
+        return new ReferenceQuery(symbolId, ReferenceKind.USAGE, 50, null);
+    }
+
+    public ReferenceQuery inWorkspace(String id) {
+        return new ReferenceQuery(symbolId, kind, limit, id);
     }
 }

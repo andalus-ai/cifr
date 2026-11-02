@@ -7,7 +7,6 @@ import java.util.List;
 public interface SymbolIndex {
     Uni<List<SymbolInfo>> getSymbols(Path file);
 
-    /** Workspace-aware lookup; legacy implementations retain their old behavior. */
     default Uni<List<SymbolInfo>> getSymbols(Path file, String workspaceId) {
         return getSymbols(file);
     }
@@ -19,6 +18,12 @@ public interface SymbolIndex {
     }
 
     Uni<SymbolInfo> getSymbol(SymbolId id);
+
+    /** Resolves a symbol inside the caller's workspace when that identity is known. */
+    default Uni<SymbolInfo> getSymbol(SymbolId id, String workspaceId) {
+        return getSymbol(id);
+    }
+
     void registerSymbol(SymbolInfo info);
     void clear();
 

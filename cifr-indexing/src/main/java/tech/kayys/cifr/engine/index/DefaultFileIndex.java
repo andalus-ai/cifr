@@ -17,19 +17,17 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class DefaultFileIndex implements FileIndex {
+    // Relative paths are unique only within a workspace.
+    private final Map<String, FileRecord> fileRecords = new ConcurrentHashMap<>();
 
-    private final Map<Path, FileRecord> fileRecords = new ConcurrentHashMap<>();
-
-    @Inject
-    FileClassifier classifier;
+    @Inject FileClassifier classifier;
 
     @Override
     public Uni<WorkspaceFingerprint> computeFingerprint(Path workspaceRoot) {
         return Uni.createFrom().item(() -> {
             try {
                 long fileCount = fileRecords.isEmpty() ? countFiles(workspaceRoot) : fileRecords.size();
-                String fakeHash = "repo-hash-" + fileCount;
-                return new WorkspaceFingerprint(fakeHash, "1.0", "cfg-hash-1");
+                return new WorkspaceFingerprint("repo-hash-" + fileCount, "1.0", "cfg-hash-1");
             } catch (Exception e) {
                 throw new RuntimeException("Failed to compute fingerprint", e);
             }
@@ -38,29 +36,36 @@ public class DefaultFileIndex implements FileIndex {
 
     @Override
     public Uni<List<FileRecord>> scanWorkspace(Path workspaceRoot) {
+        return scanWorkspace(workspaceRoot, "default-workspace");
+    }
+
+    @Override
+    public Uni<List<FileRecord>> scanWorkspace(Path workspaceRoot, String workspaceId) {
+        if (workspaceRoot == null || workspaceId == null || workspaceId.isBlank()) {
+            return Uni.createFrom().failure(new IllegalArgumentException("workspace root and workspaceId are required"));
+        }
         return Uni.createFrom().item(() -> {
             List<FileRecord> records = new ArrayList<>();
-            try (Stream<Path> paths = Files.walk(workspaceRoot)) {
-                paths.filter(Files::isRegularFile)
-                     .filter(this::shouldInclude)
-                     .forEach(p -> {
-                         try {
-                             long size = Files.size(p);
-                             String hash = computeHash(p);
-                             String lang = classifier != null ? classifier.detectLanguage(p) : "unknown";
-                             boolean isGenerated = classifier != null && classifier.isGenerated(p);
-                             boolean isTest = classifier != null && classifier.isTest(p);
-                             FileRole role = classifier != null ? classifier.classifyRole(p) : FileRole.SOURCE;
-                             
-                             FileRecord rec = new FileRecord(p, hash, size, lang, isGenerated, isTest, role);
-                             registerFile(rec);
-                             records.add(rec);
-                         } catch (IOException e) {
-                             // Ignore unreadable files
-                         }
-                     });
+            Path root = workspaceRoot.toAbsolutePath().normalize();
+            try (Stream<Path> paths = Files.walk(root)) {
+                paths.filter(Files::isRegularFile).filter(this::shouldInclude).forEach(path -> {
+                    try {
+                        long size = Files.size(path);
+                        String hash = computeHash(path);
+                        String language = classifier == null ? "unknown" : classifier.detectLanguage(path);
+                        boolean generated = classifier != null && classifier.isGenerated(path);
+                        boolean test = classifier != null && classifier.isTest(path);
+                        FileRole role = classifier == null ? FileRole.SOURCE : classifier.classifyRole(path);
+                        FileRecord record = new FileRecord(root.relativize(path), hash, size, language,
+                                generated, test, role, workspaceId);
+                        registerFile(record);
+                        records.add(record);
+                    } catch (IOException ignored) {
+                        // Unreadable files are omitted from this snapshot.
+                    }
+                });
             } catch (IOException e) {
-                throw new RuntimeException("Failed to scan workspace", e);
+                throw new RuntimeException("Failed to scan workspace " + root, e);
             }
             return records;
         });
@@ -68,24 +73,37 @@ public class DefaultFileIndex implements FileIndex {
 
     @Override
     public Uni<List<FileRecord>> getCurrentIndex(String workspaceId) {
-        return Uni.createFrom().item(new ArrayList<>(fileRecords.values()));
+        if (workspaceId == null || workspaceId.isBlank()) {
+            return Uni.createFrom().failure(new IllegalArgumentException("workspaceId is required"));
+        }
+        return Uni.createFrom().item(() -> fileRecords.values().stream()
+                .filter(record -> workspaceId.equals(record.workspaceId()))
+                .toList());
     }
 
     @Override
     public void registerFile(FileRecord record) {
-        if (record != null && record.path() != null) {
-            fileRecords.put(record.path(), record);
-        }
+        if (record == null || record.path() == null || record.workspaceId() == null || record.workspaceId().isBlank()) return;
+        fileRecords.put(fileKey(record.workspaceId(), record.path()), record);
     }
 
     @Override
     public void clear() {
         fileRecords.clear();
     }
-    
+
+    @Override
+    public void clearWorkspace(String workspaceId) {
+        if (workspaceId != null) fileRecords.keySet().removeIf(key -> key.startsWith(workspaceId + "|"));
+    }
+
+    private static String fileKey(String workspaceId, Path path) {
+        return workspaceId + "|" + path.normalize();
+    }
+
     private boolean shouldInclude(Path path) {
-        String pStr = path.toString();
-        return !pStr.contains("/.git/") && !pStr.contains("/.idea/") && !pStr.contains("/target/");
+        String value = path.toString().replace('\\', '/');
+        return !value.contains("/.git/") && !value.contains("/.idea/") && !value.contains("/target/");
     }
 
     private long countFiles(Path root) throws IOException {
@@ -97,14 +115,10 @@ public class DefaultFileIndex implements FileIndex {
 
     private String computeHash(Path path) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = Files.readAllBytes(path);
-            byte[] hashBytes = digest.digest(bytes);
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hashBytes) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path));
+            StringBuilder result = new StringBuilder();
+            for (byte value : digest) result.append(String.format("%02x", value));
+            return result.toString();
         } catch (NoSuchAlgorithmException | IOException e) {
             return "unknown-hash";
         }
