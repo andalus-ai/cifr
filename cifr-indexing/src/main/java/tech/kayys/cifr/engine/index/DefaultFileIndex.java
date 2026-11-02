@@ -89,7 +89,7 @@ public class DefaultFileIndex implements FileIndex {
             FileRecord record = entry.getValue();
             if (!workspaceId.equals(record.workspaceId()) || record.path() == null) return false;
             Path indexed = record.path().normalize();
-            return indexed.equals(normalized) || indexed.endsWith(normalized) || normalized.endsWith(indexed);
+            return indexed.equals(normalized);
         });
     }
 
