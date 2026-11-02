@@ -15,6 +15,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -39,6 +41,7 @@ public class DefaultExecutionSandbox implements ExecutionSandbox {
         Process process = null;
         CompletableFuture<String> stdoutFuture = null;
         CompletableFuture<String> stderrFuture = null;
+        ExecutorService streamReaders = Executors.newFixedThreadPool(2);
         try {
             validate(command, policy);
 
@@ -54,8 +57,8 @@ public class DefaultExecutionSandbox implements ExecutionSandbox {
 
             // Drain both pipes concurrently before waiting; waiting first can deadlock
             // when a child fills either OS pipe buffer.
-            stdoutFuture = captureAsync(process.getInputStream());
-            stderrFuture = captureAsync(process.getErrorStream());
+            stdoutFuture = captureAsync(process.getInputStream(), streamReaders);
+            stderrFuture = captureAsync(process.getErrorStream(), streamReaders);
 
             long timeoutMillis = timeoutMillis(policy);
             boolean completed = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);
@@ -86,6 +89,7 @@ public class DefaultExecutionSandbox implements ExecutionSandbox {
             String message = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             return new ExecutionResult(-1, "", message, false);
         } finally {
+            streamReaders.shutdownNow();
             if (process != null) {
                 try { process.getInputStream().close(); } catch (IOException ignored) {}
                 try { process.getErrorStream().close(); } catch (IOException ignored) {}
@@ -119,14 +123,14 @@ public class DefaultExecutionSandbox implements ExecutionSandbox {
         return millis;
     }
 
-    private static CompletableFuture<String> captureAsync(InputStream stream) {
+    private static CompletableFuture<String> captureAsync(InputStream stream, ExecutorService streamReaders) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return capture(stream);
             } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
             }
-        });
+        }, streamReaders);
     }
 
     private static String capture(InputStream stream) throws IOException {
