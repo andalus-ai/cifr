@@ -18,48 +18,47 @@ public class DefaultReferenceIndex implements ReferenceIndex {
 
     @Override
     public Uni<List<Reference>> getReferences(ReferenceRequest request) {
-        if (request == null || request.targetSymbol() == null) {
+        if (request == null || request.targetSymbol() == null || fileIndex == null || symbolIndex == null) {
             return Uni.createFrom().item(List.of());
         }
         String workspaceId = request.workspaceId();
-        return symbolIndex.getSymbol(request.targetSymbol(), workspaceId)
-                .onItem().transformToUni(symbol -> {
-                    if (symbol == null || symbol.file() == null) {
+        return fileIndex.getCurrentIndex(workspaceId)
+                .onItem().transformToUni(records -> findDefinition(records, 0, request.targetSymbol(), workspaceId))
+                .onItem().transformToUni(definition -> {
+                    if (definition == null || referenceResolver == null
+                            || !referenceResolver.supports(definition.record())) {
                         return Uni.createFrom().item(List.of());
                     }
-                    // Refresh from CIFR IDE first; the lightweight parser remains a fallback.
-                    return symbolIndex.getSymbols(symbol.file(), workspaceId)
-                            .onItem().transformToUni(ignored -> symbolIndex.getSymbol(request.targetSymbol(), workspaceId))
-                            .onItem().transformToUni(resolved -> resolveDefinition(
-                                    resolved == null ? symbol : resolved, request, workspaceId));
+                    return referenceResolver.resolveReferences(definition.record(), request.targetSymbol())
+                            .onItem().transform(references -> {
+                                if (references == null || request.limit() <= 0 || references.size() <= request.limit()) {
+                                    return references == null ? List.of() : references;
+                                }
+                                return references.subList(0, request.limit());
+                            });
                 });
     }
 
-    private Uni<List<Reference>> resolveDefinition(SymbolInfo symbol, ReferenceRequest request, String workspaceId) {
-        if (symbol == null || symbol.file() == null || referenceResolver == null || fileIndex == null) {
-            return Uni.createFrom().item(List.of());
-        }
-        return fileIndex.getCurrentIndex(workspaceId).onItem().transformToUni(records -> {
-            FileRecord record = records.stream()
-                    .filter(candidate -> samePath(candidate.path(), symbol.file()))
+    /**
+     * Populate the IDE-backed per-file symbol cache while searching. This avoids
+     * requiring callers to have issued a separate find-symbol operation first.
+     */
+    private Uni<Definition> findDefinition(List<FileRecord> records, int offset,
+                                          tech.kayys.cifr.engine.index.symbol.SymbolId target,
+                                          String workspaceId) {
+        if (offset >= records.size()) return Uni.createFrom().nullItem();
+        FileRecord record = records.get(offset);
+        return symbolIndex.getSymbols(record.path(), workspaceId).onItem().transformToUni(symbols -> {
+            SymbolInfo match = symbols == null ? null : symbols.stream()
+                    .filter(symbol -> symbol.id() != null
+                            && (symbol.id().qualifiedName().equalsIgnoreCase(target.qualifiedName())
+                            || symbol.name().equalsIgnoreCase(target.qualifiedName())))
                     .findFirst().orElse(null);
-            if (record == null || !referenceResolver.supports(record)) {
-                return Uni.createFrom().item(List.of());
-            }
-            return referenceResolver.resolveReferences(record, request.targetSymbol())
-                    .onItem().transform(references -> {
-                        if (references == null || request.limit() <= 0 || references.size() <= request.limit()) {
-                            return references == null ? List.of() : references;
-                        }
-                        return references.subList(0, request.limit());
-                    });
+            return match != null
+                    ? Uni.createFrom().item(new Definition(record, match))
+                    : findDefinition(records, offset + 1, target, workspaceId);
         });
     }
 
-    private static boolean samePath(java.nio.file.Path left, java.nio.file.Path right) {
-        if (left == null || right == null) return false;
-        java.nio.file.Path a = left.normalize();
-        java.nio.file.Path b = right.normalize();
-        return a.equals(b) || a.endsWith(b) || b.endsWith(a);
-    }
+    private record Definition(FileRecord record, SymbolInfo symbol) { }
 }
