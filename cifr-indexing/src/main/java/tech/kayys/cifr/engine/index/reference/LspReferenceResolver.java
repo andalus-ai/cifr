@@ -39,7 +39,7 @@ public class LspReferenceResolver implements ReferenceResolver {
             return Uni.createFrom().item(List.of());
         }
         return symbolIndex.getSymbol(target, record.workspaceId()).onItem().transformToUni(symbol -> {
-            if (symbol == null || symbol.range() == null) return Uni.createFrom().item(List.of());
+            if (symbol == null || symbol.range() == null || symbol.range().startColumn() <= 0) {\n                return Uni.createFrom().item(List.of());\n            }
             return Uni.createFrom().item(() -> queryIde(record, symbol));
         });
     }
