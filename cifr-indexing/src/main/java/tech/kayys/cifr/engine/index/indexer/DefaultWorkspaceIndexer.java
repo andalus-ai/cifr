@@ -52,6 +52,9 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
     @Inject
     RelationIndex relationIndex;
 
+    @Inject
+    CifrIdeWorkspaceRegistry ideWorkspaces;
+
     public DefaultWorkspaceIndexer() {
     }
 
@@ -67,6 +70,8 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         return Uni.createFrom().item(() -> {
             long startTime = System.currentTimeMillis();
             Path root = workspaceRoot != null ? workspaceRoot.toAbsolutePath().normalize() : Path.of(".").toAbsolutePath().normalize();
+            String effectiveWorkspaceId = workspaceId == null || workspaceId.isBlank() ? "default-workspace" : workspaceId;
+            ensureIdeSession(root, effectiveWorkspaceId);
 
             AtomicInteger filesCount = new AtomicInteger(0);
             AtomicInteger symbolsCount = new AtomicInteger(0);
