@@ -72,7 +72,7 @@ the latter in CIFR.
 
 ## 4. Confirmed integration defects to address
 
-The following are source-level findings from the current `main` tree:
+The following are source-level findings and migration updates from the current integration branch:
 
 1. The indexing module's Muqabalah dependency is removed after moving its
    remaining reference lookup to the CIFR IDE host. The engine-level Muqabalah
@@ -82,9 +82,9 @@ The following are source-level findings from the current `main` tree:
    actual indexed symbol range and preserving transport errors.
 3. `DefaultReferenceIndex` now resolves the requested `SymbolInfo`, finds
    its file record in the owning workspace, and delegates to the IDE resolver.
-4. `DefaultFileIndex` now keys relative file paths by workspace ID, and
-   `DefaultSymbolIndex` supports workspace-scoped symbol lookup. The workspace
-   indexer must pass the workspace ID when registering extracted symbols.
+4. `DefaultFileIndex` now keys relative file paths by workspace ID,
+   `DefaultSymbolIndex` supports workspace-scoped symbol lookup, and
+   `DefaultWorkspaceIndexer` carries the workspace ID into extracted symbols.
 5. `CifrToolAdapter` creates a synthetic `workspace-default` ID and uses
    `WorkspaceResolver`'s static ThreadLocal to pass workspace state around a
    Mutiny execution. ThreadLocal state is not a safe async context propagation
@@ -106,34 +106,34 @@ The following are source-level findings from the current `main` tree:
 
 ### Phase A — make the headless IDE host buildable
 
-- Keep the Rust crates under `cifr-ide/crates/*`.
-- Remove the absent `src-tauri` directory from workspace membership; do not
+- [x] Keep the Rust crates under `cifr-ide/crates/*`.
+- [x] Remove the absent `src-tauri` directory from workspace membership; do not
   create an empty Tauri shell.
-- Provide the declared `cifridea-server --stdio` entry point.
-- Keep logs on stderr and preserve JSON-RPC framing on stdout.
+- [x] Provide the declared `cifridea-server --stdio` entry point.
+- [x] Keep logs on stderr and preserve JSON-RPC framing on stdout.
 - Add smoke tests for initialization, command discovery, workspace open and
   document outline when a Rust build environment is available.
 
 ### Phase B — stable Java client and workspace identity (partially complete)
 
 - [x] Add a standalone `cifr-ide-client` Java module using protocol version 2.
-- Configure the executable path explicitly (system property/environment),
+- [x] Configure the executable path through `CIFR_IDE_SERVER_COMMAND`,
   with a clear startup error if unavailable.
 - [x] Keep one managed IDE host session per workspace root, with deterministic
   window identity and explicit lifecycle/close behavior.
-- Negotiate protocol version and check required commands before use.
-- Propagate timeouts, cancellation and structured server errors. Never
-  recover infrastructure errors as empty result lists.
+- [x] Negotiate protocol version and query the host command catalogue.
+- [x] Propagate request timeouts and server errors; do not translate IDE
+  transport failures into empty reference results.
 - Keep the client independent of CDI/Quarkus; add a CDI lifecycle adapter in
   the consuming module.
 
 ### Phase C — replace the Muqabalah integration safely
 
-- Migrate symbol resolution to `doc_open` + `doc_outline`.
-- Correct CIFR's symbol cache and make reference requests resolve a real
-  `SymbolInfo` location before invoking `lsp_references`.
-- Carry workspace root and workspace/session identity explicitly through
-  indexing and tool execution; do not infer it from a process-global setting.
+- [x] Move symbol resolution to the CIFR IDE host's workspace symbol index.
+- [x] Resolve reference requests to a real `SymbolInfo` definition range before
+  invoking `lsp_references`.
+- [x] Carry workspace identity through file indexing, symbol indexing, and
+  reference queries. Tool execution still needs explicit async context propagation.
 - [x] Remove the Muqabalah Maven dependency from `cifr-indexing` after moving
   its LSP reference resolver. Keep the engine-level dependency until its
   remaining runtime/configuration consumers are audited.
