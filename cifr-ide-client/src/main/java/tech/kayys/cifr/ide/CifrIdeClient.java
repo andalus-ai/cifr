@@ -198,7 +198,7 @@ public final class CifrIdeClient implements AutoCloseable {
         }
     }
 
-    private static byte[] readFrame(InputStream input) throws IOException {
+    static byte[] readFrame(InputStream input) throws IOException {
         StringBuilder headers = new StringBuilder();
         int matched = 0;
         while (matched < 4) {
