@@ -18,7 +18,7 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class DefaultFileIndex implements FileIndex {
 
-    private final Map<Path, FileRecord> fileRecords = new ConcurrentHashMap<>();
+    private final Map<String, FileRecord> fileRecords = new ConcurrentHashMap<>();
 
     @Inject
     FileClassifier classifier;
@@ -68,13 +68,13 @@ public class DefaultFileIndex implements FileIndex {
 
     @Override
     public Uni<List<FileRecord>> getCurrentIndex(String workspaceId) {
-        return Uni.createFrom().item(new ArrayList<>(fileRecords.values()));
+        return Uni.createFrom().item(fileRecords.values().stream()\n                .filter(record -> workspaceId == null || workspaceId.equals(record.workspaceId()))\n                .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
     }
 
     @Override
     public void registerFile(FileRecord record) {
         if (record != null && record.path() != null) {
-            fileRecords.put(record.path(), record);
+            fileRecords.put(record.workspaceId() + "|" + record.path().normalize(), record);
         }
     }
 
