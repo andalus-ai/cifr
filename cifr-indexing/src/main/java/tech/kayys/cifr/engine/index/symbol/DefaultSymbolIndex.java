@@ -120,6 +120,11 @@ public class DefaultSymbolIndex implements SymbolIndex {
         symbolsByFile.entrySet().removeIf(entry -> entry.getKey().startsWith(workspaceId + "|"));
     }
 
+    @Override
+    public void invalidateResolverCache(String workspaceId) {
+        if (symbolResolver != null) symbolResolver.invalidateWorkspace(workspaceId);
+    }
+
     private static String fileKey(String workspaceId, Path file) {
         return workspaceId + "|" + file.normalize();
     }
