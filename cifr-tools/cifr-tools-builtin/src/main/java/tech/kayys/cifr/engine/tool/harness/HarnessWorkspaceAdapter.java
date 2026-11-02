@@ -2,7 +2,7 @@ package tech.kayys.cifr.engine.tool.harness;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
-import tech.kayys.cifr.engine.tool.WorkspaceResolver;
+import tech.kayys.cifr.engine.tool.ToolExecutionContext;
 import tech.kayys.andalus.harness.workspace.LocalWorkspace;
 import tech.kayys.andalus.harness.workspace.LocalWorkspaceManager;
 import tech.kayys.andalus.harness.workspace.Workspace;
@@ -48,7 +48,7 @@ public class HarnessWorkspaceAdapter {
      * @param workspaceId the Cifr workspace ID (from {@link tech.kayys.cifr.engine.tool.ToolExecutionContext})
      * @return an active {@link LocalWorkspace}, or {@code Optional.empty()} if no root is available
      */
-    public Optional<LocalWorkspace> resolve(String workspaceId) {
+    public Optional<LocalWorkspace> resolve(String workspaceId, ToolExecutionContext context) {
         if (workspaceId == null || workspaceId.isBlank()) {
             return Optional.empty();
         }
@@ -60,7 +60,7 @@ public class HarnessWorkspaceAdapter {
         }
 
         // Resolve filesystem path via Cifr WorkspaceResolver
-        Path root = WorkspaceResolver.resolveWorkspaceRoot();
+        Path root = context == null ? null : context.workspaceRoot().orElse(null);
         if (root == null) {
             LOG.warnf("No workspace root resolved for workspaceId=%s — harness workspace unavailable", workspaceId);
             return Optional.empty();
@@ -87,18 +87,11 @@ public class HarnessWorkspaceAdapter {
      * Returns the underlying root {@link Path} for a workspace without opening a full workspace.
      * Useful for tools that only need the path, not the full harness workspace.
      */
-    public Optional<Path> resolveRoot(String workspaceId) {
-        // Shortcut: resolve directly from WorkspaceResolver if workspace ID matches current context
-        Path root = WorkspaceResolver.resolveWorkspaceRoot();
-        if (root != null) {
-            return Optional.of(root);
+    public Optional<Path> resolveRoot(String workspaceId, ToolExecutionContext context) {
+        if (context == null || workspaceId == null || !workspaceId.equals(context.workspaceId())) {
+            return Optional.empty();
         }
-        // Fall back: try to open the workspace and read its root marker
-        return resolve(workspaceId).map(w -> {
-            String relRoot = w.root().value();
-            return relRoot.isEmpty() ? WorkspaceResolver.resolveWorkspaceRoot()
-                    : Path.of(relRoot).toAbsolutePath();
-        });
+        return context.workspaceRoot().map(Path::toAbsolutePath).map(Path::normalize);
     }
 
     /**
