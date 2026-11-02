@@ -6,7 +6,6 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import tech.kayys.cifr.engine.tool.CifrTool;
-import tech.kayys.cifr.engine.tool.ToolCapability;
 import tech.kayys.andalus.harness.capability.DefaultCapabilityScope;
 import tech.kayys.andalus.harness.execution.action.InMemoryActionJournal;
 import tech.kayys.andalus.harness.governance.budget.BudgetManager;
@@ -29,8 +28,6 @@ import tech.kayys.andalus.harness.tool.ToolResultRouter;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 /**
  * CDI singleton that wires all {@link CifrTool} implementations into the Andalus Harness
@@ -41,7 +38,7 @@ import java.util.stream.StreamSupport;
  *   <li>Discovers every {@code @ApplicationScoped} {@link CifrTool} via CDI.</li>
  *   <li>Wraps each one as an {@link CifrToolProvider} and registers it in a {@link ToolCatalog}.</li>
  *   <li>Builds a {@link GovernedToolExecutor} with:
- *       capability scope (allow-all by default), input/output validation,
+ *       explicit tool allowlist (deny by default), input/output validation,
  *       budget tracking via {@link BudgetManager}, and an in-memory {@link InMemoryActionJournal} for auditability.</li>
  * </ol>
  *
@@ -80,16 +77,20 @@ public class CifrHarnessBridge {
         // Build resolver (capability-name and tool-id matching)
         ToolResolver resolver = new DefaultToolResolver(catalog);
 
-        // Capability scope: allow all Cifr capability names by default
-        Set<String> allCaps = StreamSupport.stream(cifrTools.spliterator(), false)
-                .filter(t -> t.descriptor().capabilities() != null)
-                .flatMap(t -> t.descriptor().capabilities().stream())
-                .map(ToolCapability::name)
-                .collect(Collectors.toUnmodifiableSet());
-
-        DefaultCapabilityScope capScope = allCaps.isEmpty()
-                ? DefaultCapabilityScope.allowAll()
-                : DefaultCapabilityScope.allowAll(); // keep allow-all; future: tighten per policy
+        // The harness executor evaluates the tool name as the capability ID. Keep this
+        // boundary explicit and fail closed: no tool is executable until an operator
+        // opts it in through configuration.
+        String configuredTools = System.getProperty("cifr.harness.allowed-tools");
+        if (configuredTools == null || configuredTools.isBlank()) {
+            configuredTools = System.getenv("CIFR_HARNESS_ALLOWED_TOOLS");
+        }
+        Set<String> allowedTools = parseAllowedTools(configuredTools);
+        DefaultCapabilityScope capScope = DefaultCapabilityScope.of(allowedTools);
+        if (allowedTools.isEmpty()) {
+            LOG.warn("CIFR harness has no allowed tools configured; governed executions will be denied");
+        } else {
+            LOG.infof("CIFR harness explicitly enabled tools: %s", allowedTools);
+        }
 
         // Budget manager: track and govern tool calls
         DefaultBudgetLedger ledger = new DefaultBudgetLedger();
@@ -100,9 +101,9 @@ public class CifrHarnessBridge {
                 catalog,
                 resolver,
                 capScope,
-                null,                            // no policy chain — allow-all
+                null,                            // no additional policy chain configured
                 budgetManager,                   // budget manager tracking tool calls
-                null,                            // no approval gate
+                null,                            // no approval gate; scope denies unconfigured tools
                 journal,                         // in-memory audit journal
                 null,                            // no memory store
                 ToolInputValidator.standard(),   // standard schema validator
@@ -110,6 +111,16 @@ public class CifrHarnessBridge {
                 ToolResultRouter.standard(),     // standard result router
                 null                             // default scheduler
         );
+    }
+
+    static Set<String> parseAllowedTools(String configured) {
+        if (configured == null || configured.isBlank()) {
+            return Set.of();
+        }
+        return java.util.Arrays.stream(configured.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     /**
