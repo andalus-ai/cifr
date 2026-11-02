@@ -81,7 +81,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
                     .filter(path -> !isIgnored(root.relativize(path)))
                     .forEach(filePath -> {
                         Path relative = root.relativize(filePath);
-                        indexSingleFile(root, relative, filesCount, symbolsCount, depsCount);
+                        indexSingleFile(root, relative, workspaceId, filesCount, symbolsCount, depsCount);
                     });
             } catch (IOException e) {
                 LOG.errorf("Failed to index workspace at %s: %s", root, e.getMessage());
@@ -108,7 +108,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
             AtomicInteger symbolsCount = new AtomicInteger(0);
             AtomicInteger depsCount = new AtomicInteger(0);
 
-            indexSingleFile(root, relative, filesCount, symbolsCount, depsCount);
+            indexSingleFile(root, relative, workspaceId, filesCount, symbolsCount, depsCount);
             return null;
         });
     }
@@ -129,7 +129,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         return false;
     }
 
-    private void indexSingleFile(Path root, Path relative, AtomicInteger filesCount, AtomicInteger symbolsCount, AtomicInteger depsCount) {
+    private void indexSingleFile(Path root, Path relative, String workspaceId, AtomicInteger filesCount, AtomicInteger symbolsCount, AtomicInteger depsCount) {
         Path absPath = root.resolve(relative);
         String fileName = relative.getFileName().toString();
         String lang = detectLanguage(fileName);
@@ -141,7 +141,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
             String content = Files.readString(absPath);
             String contentHash = String.valueOf(content.hashCode());
 
-            FileRecord record = new FileRecord(relative, contentHash, size, lang, false, isTest, role);
+            FileRecord record = new FileRecord(relative, contentHash, size, lang, false, isTest, role, workspaceId);
             if (fileIndex != null) {
                 fileIndex.registerFile(record);
             }
