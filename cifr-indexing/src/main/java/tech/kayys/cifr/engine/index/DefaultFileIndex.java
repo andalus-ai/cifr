@@ -68,7 +68,9 @@ public class DefaultFileIndex implements FileIndex {
 
     @Override
     public Uni<List<FileRecord>> getCurrentIndex(String workspaceId) {
-        return Uni.createFrom().item(fileRecords.values().stream()\n                .filter(record -> workspaceId == null || workspaceId.equals(record.workspaceId()))\n                .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
+        return Uni.createFrom().item(fileRecords.values().stream()
+                .filter(record -> workspaceId == null || workspaceId.equals(record.workspaceId()))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
     }
 
     @Override
