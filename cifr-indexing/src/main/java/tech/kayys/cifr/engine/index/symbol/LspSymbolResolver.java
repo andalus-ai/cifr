@@ -40,7 +40,7 @@ public class LspSymbolResolver implements SymbolResolver {
                     all = workspaceSnapshots.get(record.workspaceId());
                     if (all == null) {
                         all = loadWorkspaceSymbols(record);
-                        workspaceSnapshots.put(record.workspaceId(), List.copyOf(all));
+                        if (!all.isEmpty()) workspaceSnapshots.put(record.workspaceId(), List.copyOf(all));
                     }
                 }
             }
@@ -56,6 +56,8 @@ public class LspSymbolResolver implements SymbolResolver {
     private List<SymbolInfo> loadWorkspaceSymbols(FileRecord record) {
         try {
             var session = workspaces.require(record.workspaceId());
+            JsonNode status = session.client().invoke(record.workspaceId(), "index_status", java.util.Map.of());
+            if (status.path("indexing").asBoolean(false)) return symbols;
             JsonNode response = session.client().invoke(record.workspaceId(), "find_symbols",
                     java.util.Map.of("query", "", "filter", "all", "limit", MAX_SYMBOLS));
             List<SymbolInfo> symbols = new ArrayList<>();
