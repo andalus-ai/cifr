@@ -152,6 +152,16 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         });
     }
 
+    @Override
+    public Uni<Void> closeWorkspace(String workspaceId) {
+        return Uni.createFrom().item(() -> {
+            if (workspaceId != null && !workspaceId.isBlank() && ideWorkspaces != null) {
+                ideWorkspaces.closeWorkspace(workspaceId);
+            }
+            return null;
+        });
+    }
+
     private void removeIndexedFile(Path relative, String workspaceId) {
         if (fileIndex != null) fileIndex.removeFile(relative, workspaceId);
         if (symbolIndex != null) symbolIndex.removeFile(relative, workspaceId);
