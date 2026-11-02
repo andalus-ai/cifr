@@ -23,7 +23,16 @@ public class DefaultReferenceIndex implements ReferenceIndex {
         }
         String workspaceId = request.workspaceId();
         return symbolIndex.getSymbol(request.targetSymbol(), workspaceId)
-                .onItem().transformToUni(symbol -> resolveDefinition(symbol, request, workspaceId));
+                .onItem().transformToUni(symbol -> {
+                    if (symbol == null || symbol.file() == null) {
+                        return Uni.createFrom().item(List.of());
+                    }
+                    // Refresh from CIFR IDE first; the lightweight parser remains a fallback.
+                    return symbolIndex.getSymbols(symbol.file(), workspaceId)
+                            .onItem().transformToUni(ignored -> symbolIndex.getSymbol(request.targetSymbol(), workspaceId))
+                            .onItem().transformToUni(resolved -> resolveDefinition(
+                                    resolved == null ? symbol : resolved, request, workspaceId));
+                });
     }
 
     private Uni<List<Reference>> resolveDefinition(SymbolInfo symbol, ReferenceRequest request, String workspaceId) {
