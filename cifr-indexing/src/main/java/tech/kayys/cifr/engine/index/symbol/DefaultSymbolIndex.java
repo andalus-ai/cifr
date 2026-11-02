@@ -155,6 +155,6 @@ public class DefaultSymbolIndex implements SymbolIndex {
         if (left == null || right == null) return false;
         Path a = left.normalize();
         Path b = right.normalize();
-        return a.equals(b) || a.endsWith(b) || b.endsWith(a);
+        return a.equals(b);
     }
 }
