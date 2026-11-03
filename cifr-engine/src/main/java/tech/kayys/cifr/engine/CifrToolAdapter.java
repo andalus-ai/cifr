@@ -30,6 +30,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.UUID;
 
 /**
  * Adapts an CifrTool into a tech.kayys.andalus.tool.Tool SPI instance.
@@ -85,8 +86,8 @@ public class CifrToolAdapter extends BaseResource implements Tool {
     public CompletableFuture<ToolResult> execute(ToolInvocation invocation, ToolContext context) {
         Map<String, Object> args = invocation != null && invocation.arguments() != null ? invocation.arguments() : Collections.emptyMap();
         ToolRequest req = new ToolRequest(invocation != null ? invocation.name() : "", args, Optional.empty(), Collections.emptyList());
-        ToolExecutionContext execCtx = new ToolExecutionContext(
-                "task-" + System.currentTimeMillis(),
+        ToolExecutionContext execCtx = ToolExecutionContext.of(
+                "task-" + UUID.randomUUID(),
                 workspaceId,
                 CodingPolicy.defaultPolicy(),
                 Optional.empty(),
