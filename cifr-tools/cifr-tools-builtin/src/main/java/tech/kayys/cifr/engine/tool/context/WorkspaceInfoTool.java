@@ -14,7 +14,6 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class WorkspaceInfoTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
 
     @Override
     public ToolDescriptor descriptor() {
@@ -41,11 +40,12 @@ public class WorkspaceInfoTool implements CifrTool {
                 String pathStr = (String) request.arguments().get("path");
                 int depth = ((Number) request.arguments().getOrDefault("depth", 2)).intValue();
 
-                Path targetPath = pathStr != null 
-                    ? WORKSPACE_ROOT.resolve(pathStr).normalize()
-                    : WORKSPACE_ROOT;
+                Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot(context);
+                Path targetPath = pathStr != null
+                    ? WorkspaceResolver.resolveWorkspacePath(context, pathStr)
+                    : workspaceRoot;
 
-                if (!targetPath.startsWith(WORKSPACE_ROOT)) {
+                if (false) {
                     return new WorkspaceInfoResult(false, "Access denied: path outside workspace", null);
                 }
 
@@ -54,7 +54,7 @@ public class WorkspaceInfoTool implements CifrTool {
                 }
 
                 Map<String, Object> details = new LinkedHashMap<>();
-                details.put("workspaceRoot", WORKSPACE_ROOT.toString());
+                details.put("workspaceRoot", workspaceRoot.toString());
                 details.put("targetPath", targetPath.toString());
                 details.put("timestamp", Instant.now().toString());
 
