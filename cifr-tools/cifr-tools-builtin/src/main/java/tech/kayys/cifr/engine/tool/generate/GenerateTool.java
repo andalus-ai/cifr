@@ -14,8 +14,6 @@ import java.util.Set;
 @ApplicationScoped
 public class GenerateTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -53,13 +51,8 @@ public class GenerateTool implements CifrTool {
                     return new GenerateResult(false, "Type and name are required");
                 }
 
-                Path targetPath = pathStr != null 
-                    ? WORKSPACE_ROOT.resolve(pathStr).normalize()
-                    : WORKSPACE_ROOT.resolve(name);
+                Path targetPath = context.resolveWorkspacePath(pathStr != null ? pathStr : name);
 
-                if (!targetPath.startsWith(WORKSPACE_ROOT)) {
-                    return new GenerateResult(false, "Access denied");
-                }
 
                 if (targetPath.getParent() != null) {
                     Files.createDirectories(targetPath.getParent());

@@ -13,8 +13,6 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class FormatTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -51,14 +49,14 @@ public class FormatTool implements CifrTool {
 
                 Map<String, List<String>> filesByLanguage = new HashMap<>();
                 for (String pathStr : pathStrs) {
-                    Path path = WORKSPACE_ROOT.resolve(pathStr).normalize();
-                    if (!path.startsWith(WORKSPACE_ROOT)) continue;
+                    Path path = context.resolveWorkspacePath(pathStr);
 
                     if (Files.isDirectory(path)) {
                         try (Stream<Path> walk = Files.walk(path)) {
                             walk.filter(Files::isRegularFile)
                                 .filter(this::isCodeFile)
                                 .forEach(p -> {
+                                    context.resolveWorkspacePath(context.resolveWorkspacePath(".").relativize(p).toString());
                                     String lang = detectLanguage(p, language);
                                     filesByLanguage.computeIfAbsent(lang, k -> new ArrayList<>())
                                         .add(path.relativize(p).toString());

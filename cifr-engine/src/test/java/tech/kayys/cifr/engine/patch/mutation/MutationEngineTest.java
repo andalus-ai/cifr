@@ -56,6 +56,35 @@ public class MutationEngineTest {
     }
 
     @Test
+    void rollbackCannotBeAppliedToAnotherWorkspace() throws IOException {
+        Path file = tempWorkspace.resolve("Scoped.java");
+        Files.writeString(file, "class Scoped {}");
+
+        EditProposal proposal = new EditProposal(
+                "change scoped file",
+                List.of(new FileEdit(Path.of("Scoped.java"),
+                        List.of(new TextEdit("Scoped", "Changed")))),
+                List.of(),
+                List.of());
+        MutationResult result = mutationEngine.apply(proposal, tempWorkspace).await().indefinitely();
+
+        Path otherWorkspace = Files.createTempDirectory("other-workspace-");
+        try {
+            assertThrows(SecurityException.class, () ->
+                    mutationEngine.rollback(result.id(), otherWorkspace).await().indefinitely());
+            assertEquals("class Changed {}", Files.readString(file));
+            mutationEngine.rollback(result.id(), tempWorkspace).await().indefinitely();
+            assertEquals("class Scoped {}", Files.readString(file));
+        } finally {
+            try (var stream = Files.walk(otherWorkspace)) {
+                stream.sorted((a, b) -> b.compareTo(a)).forEach(p -> {
+                    try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+                });
+            }
+        }
+    }
+
+    @Test
     void testStaleEditDetection() throws IOException {
         Path file = tempWorkspace.resolve("Sample.java");
         Files.writeString(file, "public class Sample {\n    int value = 99;\n}");

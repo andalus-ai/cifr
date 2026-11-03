@@ -15,8 +15,6 @@ import java.util.Set;
 @ApplicationScoped
 public class DiffTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -47,12 +45,9 @@ public class DiffTool implements CifrTool {
                 int contextLines = ((Number) request.arguments().getOrDefault("context", 3)).intValue();
                 boolean ignoreWhitespace = (boolean) request.arguments().getOrDefault("ignoreWhitespace", false);
 
-                Path leftPath = WORKSPACE_ROOT.resolve(leftStr).normalize();
-                Path rightPath = WORKSPACE_ROOT.resolve(rightStr).normalize();
+                Path leftPath = context.resolveWorkspacePath(leftStr);
+                Path rightPath = context.resolveWorkspacePath(rightStr);
 
-                if (!leftPath.startsWith(WORKSPACE_ROOT) || !rightPath.startsWith(WORKSPACE_ROOT)) {
-                    return new DiffResult(false, "Access denied", List.of());
-                }
 
                 if (!Files.exists(leftPath)) {
                     return new DiffResult(false, "Left file does not exist: " + leftStr, List.of());

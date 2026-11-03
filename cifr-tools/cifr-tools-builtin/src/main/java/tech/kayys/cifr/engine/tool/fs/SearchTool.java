@@ -53,7 +53,7 @@ public class SearchTool implements CifrTool {
             int limit = ((Number) request.arguments().getOrDefault("limit", DEFAULT_LIMIT)).intValue();
 
             Path searchRoot = context.resolveWorkspacePath(subPath);
-            if (!searchRoot.startsWith(WORKSPACE_ROOT) || !Files.exists(searchRoot)) {
+            if (!Files.exists(searchRoot)) {
                 return new SearchResult(query, List.of(), false);
             }
 
@@ -74,6 +74,7 @@ public class SearchTool implements CifrTool {
                     .toList();
 
                 for (Path file : files) {
+                    context.resolveWorkspacePath(context.resolveWorkspacePath(".").relativize(file).toString());
                     if (matches.size() >= limit) {
                         truncated = true;
                         break;

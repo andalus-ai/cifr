@@ -13,8 +13,6 @@ import java.util.*;
 @ApplicationScoped
 public class EditorTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -52,10 +50,7 @@ public class EditorTool implements CifrTool {
                     return new EditorResult(false, "path is required", null);
                 }
 
-                Path resolvedPath = WORKSPACE_ROOT.resolve(path).normalize();
-                if (!resolvedPath.startsWith(WORKSPACE_ROOT)) {
-                    return new EditorResult(false, "Access denied: path outside workspace", null);
-                }
+                Path resolvedPath = context.resolveWorkspacePath(path);
 
                 return switch (action.toLowerCase()) {
                     case "open" -> openFile(resolvedPath);

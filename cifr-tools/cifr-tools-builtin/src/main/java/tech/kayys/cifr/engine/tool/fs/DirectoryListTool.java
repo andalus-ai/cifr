@@ -43,7 +43,7 @@ public class DirectoryListTool implements CifrTool {
     public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
         return Uni.createFrom().item(() -> {
             try {
-                Path workspaceRoot = context.requireWorkspaceRoot();
+                Path workspaceRoot = context.resolveWorkspacePath(".");
                 String pathStr = (String) request.arguments().getOrDefault("path", ".");
                 String pattern = (String) request.arguments().getOrDefault("pattern", "*");
                 boolean recursive = Boolean.TRUE.equals(request.arguments().get("recursive"));
@@ -51,7 +51,7 @@ public class DirectoryListTool implements CifrTool {
                     recursive ? 10 : DEFAULT_MAX_DEPTH)).intValue();
                 boolean showHidden = Boolean.TRUE.equals(request.arguments().get("showHidden"));
 
-                Path dir = workspaceRoot.resolve(pathStr).normalize();
+                Path dir = context.resolveWorkspacePath(pathStr);
                 if (!Files.isDirectory(dir))
                     return new DirectoryListResult(pathStr, List.of(), false);
 
@@ -68,6 +68,7 @@ public class DirectoryListTool implements CifrTool {
                         .toList();
 
                     for (Path p : paths) {
+                        context.resolveWorkspacePath(workspaceRoot.relativize(p).toString());
                         if (entries.size() >= MAX_ENTRIES) { truncated = true; break; }
                         boolean isDir = Files.isDirectory(p);
                         BasicFileAttributes attrs = Files.readAttributes(p, BasicFileAttributes.class);
