@@ -1,5 +1,6 @@
 package tech.kayys.cifr.engine.tool;
 
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import tech.kayys.cifr.engine.patch.AppliedPatch;
@@ -8,28 +9,16 @@ import tech.kayys.cifr.engine.patch.PatchEdit;
 import tech.kayys.cifr.engine.patch.PatchOperation;
 import tech.kayys.cifr.engine.repo.GitRepositoryService;
 import tech.kayys.cifr.engine.repo.RepositorySnapshot;
-import tech.kayys.andalus.descriptor.CapabilityDescriptor;
-import tech.kayys.andalus.descriptor.ParameterDescriptor;
-import tech.kayys.andalus.extension.Id;
-import tech.kayys.andalus.extension.Metadata;
-import tech.kayys.andalus.identity.ResourceId;
-import tech.kayys.andalus.resource.ResourceType;
-import tech.kayys.andalus.tool.Tool;
-import tech.kayys.andalus.tool.ToolContext;
-import tech.kayys.andalus.tool.ToolDescriptor;
-import tech.kayys.andalus.tool.ToolInvocation;
-import tech.kayys.andalus.tool.ToolResult;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 @ApplicationScoped
-public class WorkspacePatchTool implements Tool {
+public class WorkspacePatchTool implements CifrTool {
 
     @Inject
     PatchApplier applier;
@@ -37,32 +26,16 @@ public class WorkspacePatchTool implements Tool {
     @Inject
     GitRepositoryService gitService;
 
-    private static final java.nio.file.Path WORKSPACE_ROOT = java.nio.file.Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
-        return new ToolDescriptor() {
-            @Override
-            public String name() {
-                return "workspace_patch";
-            }
-
-            @Override
-            public String description() {
-                return "Applies code patches to workspace files using expected and replacement texts.";
-            }
-
-            @Override
-            public String version() {
-                return "1.0.0";
-            }
-
-            @Override
-            public Map<String, Object> inputSchema() {
-                return Map.of(
+        return new ToolDescriptor(
+                "workspace_patch",
+                "Applies code patches to workspace files using expected and replacement texts.",
+                ToolCategory.FILESYSTEM,
+                Map.of(
                         "type", "object",
                         "properties", Map.of(
-                                "path", Map.of("type", "string", "description", "Relative path to file"),
+                                "path", Map.of("type", "string", "description", "Workspace-relative file path"),
                                 "edits", Map.of(
                                         "type", "array",
                                         "items", Map.of(
@@ -70,190 +43,68 @@ public class WorkspacePatchTool implements Tool {
                                                 "properties", Map.of(
                                                         "expectedText", Map.of("type", "string"),
                                                         "replacementText", Map.of("type", "string")
-                                                )
+                                                ),
+                                                "required", List.of("expectedText", "replacementText")
                                         )
                                 )
                         ),
                         "required", List.of("path", "edits")
-                );
-            }
-
-            @Override
-            public ResourceId id() {
-                return ResourceId.from(Id.random(), ResourceType.fromString("tool"));
-            }
-
-            @Override
-            public ResourceType type() {
-                return ResourceType.fromString("tool");
-            }
-
-            @Override
-            public Metadata metadata() {
-                return Metadata.empty();
-            }
-
-            @Override
-            public Set<String> tags() {
-                return Collections.emptySet();
-            }
-
-            @Override
-            public Set<String> categories() {
-                return Collections.emptySet();
-            }
-
-            @Override
-            public Map<String, ParameterDescriptor> inputs() {
-                return Collections.emptyMap();
-            }
-
-            @Override
-            public Map<String, ParameterDescriptor> outputs() {
-                return Collections.emptyMap();
-            }
-
-            @Override
-            public List<CapabilityDescriptor> capabilities() {
-                return Collections.emptyList();
-            }
-        };
+                ),
+                Set.of(ToolCapability.WRITE, ToolCapability.MUTATES_WORKSPACE),
+                ToolRisk.HIGH
+        );
     }
 
     @Override
-    public CompletableFuture<ToolResult> execute(ToolInvocation invocation, ToolContext context) {
-        return CompletableFuture.supplyAsync(() -> {
+    public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
+        return Uni.createFrom().item(() -> {
             try {
-                Map<String, Object> args = invocation.arguments();
+                Map<String, Object> args = request.arguments();
                 String path = (String) args.get("path");
-                
+                @SuppressWarnings("unchecked")
                 List<Map<String, Object>> editArgs = (List<Map<String, Object>>) args.get("edits");
-                List<PatchEdit> edits = new ArrayList<>();
-                for (Map<String, Object> ed : editArgs) {
-                    edits.add(new PatchEdit(
-                            (String) ed.get("expectedText"),
-                            (String) ed.get("replacementText")
-                    ));
+                if (path == null || path.isBlank() || editArgs == null || editArgs.isEmpty()) {
+                    return new WorkspacePatchResult(false, "A workspace-relative path and at least one edit are required");
                 }
 
-                // Capture a baseline snapshot to pass to the applier so the
-                // WorkspaceGuard can perform a more robust freshness check.
+                List<PatchEdit> edits = new ArrayList<>();
+                for (Map<String, Object> edit : editArgs) {
+                    String expected = (String) edit.get("expectedText");
+                    String replacement = (String) edit.get("replacementText");
+                    if (expected == null || replacement == null) {
+                        return new WorkspacePatchResult(false, "Each edit requires expectedText and replacementText");
+                    }
+                    edits.add(new PatchEdit(expected, replacement));
+                }
+
+                Path workspaceRoot = context.resolveWorkspacePath(".");
                 RepositorySnapshot baseline = null;
                 try {
-                    baseline = gitService.captureSnapshot(WORKSPACE_ROOT);
-                } catch (Exception e) {
-                    // best-effort: if snapshot capture fails, continue with null baseline
+                    baseline = gitService != null ? gitService.captureSnapshot(workspaceRoot) : null;
+                } catch (Exception ignored) {
+                    // Patch validation and path containment still apply without a Git baseline.
                 }
 
                 PatchOperation patch = new PatchOperation(
                         UUID.randomUUID().toString(),
                         path,
                         edits,
-                        "Applied by tool",
+                        "Applied by CIFR workspace patch tool",
                         null,
                         baseline
                 );
-
-                AppliedPatch result = applier.apply(patch);
-
-                // build richer outputs from the applied change evidence
-                String beforeHash = null;
-                String afterHash = null;
-                int editsApplied = patch.edits().size();
-                if (result.changes() != null && !result.changes().changes().isEmpty()) {
-                    var cr = result.changes().changes().get(0);
-                    beforeHash = cr.beforeHash();
-                    afterHash = cr.afterHash();
-                }
-
-                String finalBefore = beforeHash;
-                String finalAfter = afterHash;
-
-                return new ToolResult() {
-                    @Override
-                    public Map<String, Object> getOutputs() {
-                        return Map.of(
-                                "status", "success",
-                                "file", path,
-                                "editsApplied", editsApplied,
-                                "beforeHash", finalBefore,
-                                "afterHash", finalAfter
-                        );
-                    }
-
-                    @Override
-                    public boolean isSuccess() {
-                        return true;
-                    }
-
-                    @Override
-                    public String getErrorMessage() {
-                        return null;
-                    }
-
-                    @Override
-                    public ResourceId id() {
-                        return ResourceId.from(Id.random(), ResourceType.fromString("tool-result"));
-                    }
-
-                    @Override
-                    public ResourceType type() {
-                        return ResourceType.fromString("tool-result");
-                    }
-
-                    @Override
-                    public Metadata metadata() {
-                        return Metadata.empty();
-                    }
-                };
+                AppliedPatch result = applier.apply(patch, context);
+                return new WorkspacePatchResult(true,
+                        "Patch applied: " + path + " (" + edits.size() + " edit(s), id=" + result.patchId() + ")");
             } catch (Exception e) {
-                return new ToolResult() {
-                    @Override
-                    public Map<String, Object> getOutputs() {
-                        return Collections.emptyMap();
-                    }
-
-                    @Override
-                    public boolean isSuccess() {
-                        return false;
-                    }
-
-                    @Override
-                    public String getErrorMessage() {
-                        return e.getMessage();
-                    }
-
-                    @Override
-                    public ResourceId id() {
-                        return ResourceId.from(Id.random(), ResourceType.fromString("tool-result"));
-                    }
-
-                    @Override
-                    public ResourceType type() {
-                        return ResourceType.fromString("tool-result");
-                    }
-
-                    @Override
-                    public Metadata metadata() {
-                        return Metadata.empty();
-                    }
-                };
+                return new WorkspacePatchResult(false,
+                        "Patch failed: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
             }
         });
     }
 
-    @Override
-    public ResourceId id() {
-        return ResourceId.from(Id.random(), ResourceType.fromString("tool"));
-    }
-
-    @Override
-    public ResourceType type() {
-        return ResourceType.fromString("tool");
-    }
-
-    @Override
-    public Metadata metadata() {
-        return Metadata.empty();
+    private record WorkspacePatchResult(boolean success, String summary) implements ToolResult {
+        @Override public boolean isSuccess() { return success; }
+        @Override public String getSummary() { return summary; }
     }
 }
