@@ -5,7 +5,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import tech.kayys.cifr.engine.tool.*;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +82,7 @@ public class GitStashTool implements CifrTool {
         if (message != null && !message.isBlank()) { cmd.add("-m"); cmd.add(message); }
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.directory(WORKSPACE_ROOT.toFile());
+        pb.directory(workspace.toFile());
         pb.redirectErrorStream(true);
         Process p = pb.start();
         String output = new String(p.getInputStream().readAllBytes());
@@ -99,7 +98,7 @@ public class GitStashTool implements CifrTool {
         if (index > 0) cmd.add("stash@{" + index + "}");
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.directory(WORKSPACE_ROOT.toFile());
+        pb.directory(workspace.toFile());
         pb.redirectErrorStream(true);
         Process p = pb.start();
         String output = new String(p.getInputStream().readAllBytes());
@@ -114,7 +113,7 @@ public class GitStashTool implements CifrTool {
     private GitStashResult dropStash(int index, Path workspace) throws Exception {
         String ref = "stash@{" + index + "}";
         ProcessBuilder pb = new ProcessBuilder("git", "stash", "drop", ref);
-        pb.directory(WORKSPACE_ROOT.toFile());
+        pb.directory(workspace.toFile());
         pb.redirectErrorStream(true);
         Process p = pb.start();
         String output = new String(p.getInputStream().readAllBytes());
