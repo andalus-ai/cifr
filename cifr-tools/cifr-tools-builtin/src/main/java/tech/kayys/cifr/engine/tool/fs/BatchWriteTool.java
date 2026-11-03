@@ -52,7 +52,6 @@ public class BatchWriteTool implements CifrTool {
                 // Validate and backup
                 for (Map<String, Object> spec : fileSpecs) {
                     Path abs = WorkspaceResolver.resolveWorkspacePath(context, (String) spec.get("path"));
-                    if (!abs.startsWith(WORKSPACE_ROOT)) throw new SecurityException("Path outside workspace: " + spec.get("path"));
                     if (atomic && Files.exists(abs)) backups.put(abs, Files.readString(abs));
                 }
 
