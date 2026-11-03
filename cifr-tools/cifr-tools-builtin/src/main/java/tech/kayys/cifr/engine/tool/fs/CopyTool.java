@@ -47,8 +47,6 @@ public class CopyTool implements CifrTool {
                 Path src = context.resolveWorkspacePath(srcStr);
                 Path dst = context.resolveWorkspacePath(dstStr);
 
-                if (!src.startsWith(WORKSPACE_ROOT) || !dst.startsWith(WORKSPACE_ROOT))
-                    return new CopyResult(false, "Access denied: path outside workspace");
                 if (!Files.exists(src))
                     return new CopyResult(false, "Source does not exist: " + srcStr);
                 if (Files.exists(dst) && !overwrite)
