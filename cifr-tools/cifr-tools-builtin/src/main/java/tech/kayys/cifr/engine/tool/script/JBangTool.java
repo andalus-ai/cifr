@@ -9,7 +9,6 @@ import tech.kayys.cifr.engine.tool.harness.CifrHarnessBridge;
 import tech.kayys.cifr.engine.tool.harness.HarnessToolExecutionContext;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 /**
@@ -62,12 +61,9 @@ public class JBangTool implements CifrTool {
             String action = argString(args, "action", "run");
             int timeoutSec = argInt(args, "timeout", DEFAULT_TIMEOUT_SECONDS);
 
-            // Prefer workspaceRoot from context (avoids ThreadLocal fallback)
-            Path workingDir = (context != null && context.workspaceRoot() != null)
-                    ? context.workspaceRoot().orElseGet(WorkspaceResolver::resolveWorkspaceRoot)
-                    : WorkspaceResolver.resolveWorkspaceRoot();
+            Path workingDir = context.resolveWorkspacePath(".");
             if (args.containsKey("working_dir") && args.get("working_dir") instanceof String wdStr) {
-                workingDir = Paths.get(wdStr);
+                workingDir = context.resolveWorkspacePath(wdStr);
             }
 
             try {
@@ -99,6 +95,9 @@ public class JBangTool implements CifrTool {
                 if (code != null && !code.isBlank()) {
                     result = runner.runSnippet(code, deps, scriptArgs, jbangFlags, timeoutSec, workingDir);
                 } else if (scriptPath != null && !scriptPath.isBlank()) {
+                    if (!scriptPath.matches("^[a-zA-Z][a-zA-Z0-9+.-]*://.*")) {
+                        scriptPath = context.resolveWorkspacePath(scriptPath).toString();
+                    }
                     result = runner.runScript(scriptPath, scriptArgs, jbangFlags, timeoutSec, workingDir);
                 } else {
                     return JBangResult.err("Either 'code' or 'script_path' must be provided for 'run' action.", "", "", -1);
