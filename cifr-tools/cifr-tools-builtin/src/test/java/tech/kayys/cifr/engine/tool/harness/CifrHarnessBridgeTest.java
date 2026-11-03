@@ -1,5 +1,6 @@
 package tech.kayys.cifr.engine.tool.harness;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tech.kayys.cifr.engine.tool.CifrTool;
@@ -27,9 +28,12 @@ public class CifrHarnessBridgeTest {
 
     private CifrHarnessBridge bridge;
     private JShellTool jshellTool;
+    private String previousAllowedTools;
 
     @BeforeEach
     void setUp() throws Exception {
+        previousAllowedTools = System.getProperty("cifr.harness.allowed-tools");
+        System.setProperty("cifr.harness.allowed-tools", "jshell");
         bridge = new CifrHarnessBridge();
         jshellTool = new JShellTool();
 
@@ -73,6 +77,31 @@ public class CifrHarnessBridgeTest {
         toolsField.set(bridge, instanceMock);
 
         bridge.init();
+    }
+
+    @AfterEach
+    void restoreConfiguration() {
+        if (previousAllowedTools == null) {
+            System.clearProperty("cifr.harness.allowed-tools");
+        } else {
+            System.setProperty("cifr.harness.allowed-tools", previousAllowedTools);
+        }
+    }
+
+    @Test
+    void testUnlistedToolIsDeniedBeforeResolution() {
+        HarnessToolExecutionContext ctx = new HarnessToolExecutionContext("test-task-denied", () -> {});
+        ToolResult result = bridge.executeGoverned("jbang", Map.of(), ctx);
+
+        assertNotNull(result);
+        assertFalse(result.isSuccess(), "Tools outside the explicit allowlist must be denied");
+    }
+
+    @Test
+    void testAllowlistParsingIsExactAndIgnoresEmptyEntries() {
+        assertEquals(Set.of("jshell", "read_file"),
+                CifrHarnessBridge.parseAllowedTools(" jshell, ,read_file "));
+        assertTrue(CifrHarnessBridge.parseAllowedTools(" , ").isEmpty());
     }
 
     @Test
