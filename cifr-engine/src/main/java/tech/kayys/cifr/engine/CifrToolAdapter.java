@@ -18,32 +18,33 @@ import tech.kayys.andalus.tool.ToolDescriptor;
 import tech.kayys.andalus.tool.ToolInvocation;
 import tech.kayys.andalus.tool.ToolResult;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.nio.file.Path;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Adapts an CifrTool into a tech.kayys.andalus.tool.Tool SPI instance.
- */
+/** Adapts a CIFR tool to the Andalus Tool SPI while preserving invocation workspace scope. */
 public class CifrToolAdapter extends BaseResource implements Tool {
 
     private final CifrTool delegate;
     private final ObjectMapper mapper = new ObjectMapper();
-    private final String workspacePath;
+    private final Path workspaceRoot;
 
     public CifrToolAdapter(CifrTool delegate, String workspacePath) {
-        super(new ResourceId.ToolId(Id.random()), 
+        super(new ResourceId.ToolId(Id.random()),
               Metadata.builder()
                       .name(delegate.descriptor() != null ? delegate.descriptor().name() : "cifr-tool")
                       .description(delegate.descriptor() != null ? delegate.descriptor().description() : "")
                       .build());
         this.delegate = delegate;
-        this.workspacePath = workspacePath;
+        this.workspaceRoot = workspacePath == null || workspacePath.isBlank()
+                ? null : Path.of(workspacePath).toAbsolutePath().normalize();
     }
 
     public CifrTool getDelegate() {
@@ -62,11 +63,9 @@ public class CifrToolAdapter extends BaseResource implements Tool {
             @Override public String description() { return toolDesc; }
             @Override public String version() { return "1.0.0"; }
             @Override public Map<String, Object> inputSchema() { return schema; }
-            
             @Override public ResourceId id() { return CifrToolAdapter.this.id(); }
             @Override public Metadata metadata() { return CifrToolAdapter.this.metadata(); }
             @Override public ResourceType type() { return CifrToolAdapter.this.type(); }
-
             @Override public Set<String> tags() { return Collections.emptySet(); }
             @Override public Set<String> categories() { return Collections.emptySet(); }
             @Override public Map<String, ParameterDescriptor> inputs() { return Collections.emptyMap(); }
@@ -77,13 +76,17 @@ public class CifrToolAdapter extends BaseResource implements Tool {
 
     @Override
     public CompletableFuture<ToolResult> execute(ToolInvocation invocation, ToolContext context) {
-        Map<String, Object> args = invocation != null && invocation.arguments() != null ? invocation.arguments() : Collections.emptyMap();
-        ToolRequest req = new ToolRequest(invocation != null ? invocation.name() : "", args, Optional.empty(), Collections.emptyList());
-        Path workspaceRoot = workspacePath == null || workspacePath.isBlank()
-                ? null : Path.of(workspacePath).toAbsolutePath().normalize();
-        String workspaceId = workspaceRoot != null ? workspaceRoot.toString() : "workspace-unresolved";
+        if (workspaceRoot == null || !Files.isDirectory(workspaceRoot)) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("CIFR tool execution requires an existing explicit workspace root"));
+        }
+        Map<String, Object> args = invocation != null && invocation.arguments() != null
+                ? invocation.arguments() : Collections.emptyMap();
+        ToolRequest req = new ToolRequest(invocation != null ? invocation.name() : "",
+                args, Optional.empty(), Collections.emptyList());
+        String workspaceId = workspaceRoot.toString();
         ToolExecutionContext execCtx = ToolExecutionContext.of(
-                "task-" + System.currentTimeMillis(),
+                "task-" + UUID.randomUUID(),
                 workspaceId,
                 CodingPolicy.defaultPolicy(),
                 Optional.empty(),
@@ -117,9 +120,11 @@ public class CifrToolAdapter extends BaseResource implements Tool {
                     } else if (res != null) {
                         try {
                             outputs.put("data", mapper.convertValue(res, Map.class));
-                        } catch (Exception ignored) {}
+                        } catch (Exception ignored) {
+                            // Result serialization is best-effort; summary/success remain available.
+                        }
                     }
-                    
+
                     class OutputToolResult extends BaseResource implements ToolResult {
                         public OutputToolResult(Id id) {
                             super(new ResourceId.CustomId(id, new ResourceType.Custom("result")), Metadata.empty());
