@@ -14,8 +14,6 @@ import java.util.Set;
 @ApplicationScoped
 public class GitStashTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -42,6 +40,7 @@ public class GitStashTool implements CifrTool {
     public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
         return Uni.createFrom().item(() -> {
             try {
+                Path workspace = context.resolveWorkspacePath(".");
                 String action = (String) request.arguments().get("action");
                 String message = (String) request.arguments().get("message");
                 int index = request.arguments().containsKey("index")
@@ -49,11 +48,11 @@ public class GitStashTool implements CifrTool {
                 boolean keepIndex = Boolean.TRUE.equals(request.arguments().get("keepIndex"));
 
                 return switch (action.toLowerCase()) {
-                    case "list" -> listStashes();
-                    case "push" -> pushStash(message, keepIndex);
-                    case "pop" -> applyOrPop(index, true);
-                    case "apply" -> applyOrPop(index, false);
-                    case "drop" -> dropStash(index);
+                    case "list" -> listStashes(workspace);
+                    case "push" -> pushStash(message, keepIndex, workspace);
+                    case "pop" -> applyOrPop(index, true, workspace);
+                    case "apply" -> applyOrPop(index, false, workspace);
+                    case "drop" -> dropStash(index, workspace);
                     default -> new GitStashResult(false, "Unknown action: " + action, List.of());
                 };
             } catch (Exception e) {
@@ -62,9 +61,9 @@ public class GitStashTool implements CifrTool {
         });
     }
 
-    private GitStashResult listStashes() throws Exception {
+    private GitStashResult listStashes(Path workspace) throws Exception {
         ProcessBuilder pb = new ProcessBuilder("git", "stash", "list");
-        pb.directory(WORKSPACE_ROOT.toFile());
+        pb.directory(workspace.toFile());
         pb.redirectErrorStream(true);
         Process p = pb.start();
         String output = new String(p.getInputStream().readAllBytes());
@@ -78,7 +77,7 @@ public class GitStashTool implements CifrTool {
         return new GitStashResult(true, "Found " + stashes.size() + " stash(es)", stashes);
     }
 
-    private GitStashResult pushStash(String message, boolean keepIndex) throws Exception {
+    private GitStashResult pushStash(String message, boolean keepIndex, Path workspace) throws Exception {
         List<String> cmd = new ArrayList<>(List.of("git", "stash", "push"));
         if (keepIndex) cmd.add("--keep-index");
         if (message != null && !message.isBlank()) { cmd.add("-m"); cmd.add(message); }
@@ -95,7 +94,7 @@ public class GitStashTool implements CifrTool {
             : new GitStashResult(false, "Failed to stash: " + output, List.of());
     }
 
-    private GitStashResult applyOrPop(int index, boolean pop) throws Exception {
+    private GitStashResult applyOrPop(int index, boolean pop, Path workspace) throws Exception {
         List<String> cmd = new ArrayList<>(List.of("git", "stash", pop ? "pop" : "apply"));
         if (index > 0) cmd.add("stash@{" + index + "}");
 
@@ -112,7 +111,7 @@ public class GitStashTool implements CifrTool {
             : new GitStashResult(false, "Failed to " + verb.toLowerCase() + ": " + output, List.of());
     }
 
-    private GitStashResult dropStash(int index) throws Exception {
+    private GitStashResult dropStash(int index, Path workspace) throws Exception {
         String ref = "stash@{" + index + "}";
         ProcessBuilder pb = new ProcessBuilder("git", "stash", "drop", ref);
         pb.directory(WORKSPACE_ROOT.toFile());
