@@ -47,8 +47,6 @@ public class RenameTool implements CifrTool {
                 Path src = context.resolveWorkspacePath(srcStr);
                 Path dst = context.resolveWorkspacePath(dstStr);
 
-                if (false)
-                    return new RenameResult(false, "Access denied: path outside workspace");
                 if (!Files.exists(src))
                     return new RenameResult(false, "Source does not exist: " + srcStr);
                 if (Files.exists(dst) && !overwrite)
