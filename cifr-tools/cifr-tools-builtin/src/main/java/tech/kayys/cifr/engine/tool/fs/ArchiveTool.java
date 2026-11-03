@@ -16,7 +16,6 @@ import java.util.zip.ZipOutputStream;
 @ApplicationScoped
 public class ArchiveTool implements CifrTool {
     
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final int BUFFER_SIZE = 8192;
     private static final long MAX_ARCHIVE_SIZE = 2L * 1024 * 1024 * 1024; // 2GB
 
@@ -64,26 +63,21 @@ public class ArchiveTool implements CifrTool {
                     return new ArchiveResult(false, "No source paths specified", null, 0, 0);
                 }
 
+                Path workspaceRoot = context.resolveWorkspacePath(".");
                 List<Path> resolvedSources = new ArrayList<>();
                 for (String source : sources) {
-                    Path resolved = WORKSPACE_ROOT.resolve(source).normalize();
-                    if (!resolved.startsWith(WORKSPACE_ROOT)) {
-                        return new ArchiveResult(false, "Access denied: path outside workspace: " + source, null, 0, 0);
-                    }
-                    if (!Files.exists(resolved)) {
+                    Path resolved = context.resolveWorkspacePath(source);
+                        if (!Files.exists(resolved)) {
                         return new ArchiveResult(false, "Source does not exist: " + source, null, 0, 0);
                     }
                     resolvedSources.add(resolved);
                 }
 
-                Path destPath = destination != null ? WORKSPACE_ROOT.resolve(destination).normalize() : null;
-                if (destPath != null && !destPath.startsWith(WORKSPACE_ROOT)) {
-                    return new ArchiveResult(false, "Access denied: destination outside workspace", null, 0, 0);
-                }
+                Path destPath = destination != null ? context.resolveWorkspacePath(destination) : null;
 
                 return switch (action.toLowerCase()) {
-                    case "create" -> createZipArchive(resolvedSources, destPath);
-                    case "extract" -> extractZipArchive(resolvedSources.get(0), destPath);
+                    case "create" -> createZipArchive(resolvedSources, destPath, workspaceRoot, context);
+                    case "extract" -> extractZipArchive(resolvedSources.get(0), destPath, workspaceRoot, context);
                     case "list" -> listZipArchive(resolvedSources.get(0));
                     default -> new ArchiveResult(false, "Unknown action: " + action, null, 0, 0);
                 };
@@ -94,11 +88,11 @@ public class ArchiveTool implements CifrTool {
         });
     }
 
-    private ArchiveResult createZipArchive(List<Path> sources, Path destPath) {
+    private ArchiveResult createZipArchive(List<Path> sources, Path destPath, Path workspaceRoot, ToolExecutionContext context) {
         try {
             if (destPath == null) {
                 String baseName = sources.get(0).getFileName().toString();
-                destPath = WORKSPACE_ROOT.resolve(baseName + ".zip");
+                destPath = workspaceRoot.resolve(baseName + ".zip");
             }
 
             if (destPath.getParent() != null) {
@@ -112,6 +106,7 @@ public class ArchiveTool implements CifrTool {
                 if (Files.isDirectory(source)) {
                     try (var walk = Files.walk(source)) {
                         walk.filter(Files::isRegularFile).forEach(file -> {
+                            context.resolveWorkspacePath(workspaceRoot.relativize(file).toString());
                             allFiles.add(file);
                             sourceMapping.put(file, source);
                         });
@@ -155,10 +150,10 @@ public class ArchiveTool implements CifrTool {
         }
     }
 
-    private ArchiveResult extractZipArchive(Path archivePath, Path destPath) {
+    private ArchiveResult extractZipArchive(Path archivePath, Path destPath, Path workspaceRoot, ToolExecutionContext context) {
         try {
             if (destPath == null) {
-                destPath = WORKSPACE_ROOT.resolve(archivePath.getFileName().toString().replaceAll("\\.[^.]+$", ""));
+                destPath = workspaceRoot.resolve(archivePath.getFileName().toString().replaceAll("\\.[^.]+$", ""));
             }
             Files.createDirectories(destPath);
 
@@ -166,20 +161,26 @@ public class ArchiveTool implements CifrTool {
                 byte[] buffer = new byte[BUFFER_SIZE];
                 ZipEntry entry;
                 while ((entry = zis.getNextEntry()) != null) {
-                    if (entry.isDirectory()) {
-                        Files.createDirectories(destPath.resolve(entry.getName()));
-                        continue;
-                    }
                     Path target = destPath.resolve(entry.getName()).normalize();
                     if (!target.startsWith(destPath)) {
                         throw new SecurityException("Zip entry attempts path traversal: " + entry.getName());
+                    }
+                    context.resolveWorkspacePath(workspaceRoot.relativize(target).toString());
+                    if (entry.isDirectory()) {
+                        Files.createDirectories(target);
+                        continue;
                     }
                     if (target.getParent() != null) {
                         Files.createDirectories(target.getParent());
                     }
                     try (FileOutputStream fos = new FileOutputStream(target.toFile())) {
                         int length;
+                        long extractedBytes = 0;
                         while ((length = zis.read(buffer)) > 0) {
+                            extractedBytes += length;
+                            if (extractedBytes > MAX_ARCHIVE_SIZE) {
+                                throw new SecurityException("Archive extraction exceeded the size limit");
+                            }
                             fos.write(buffer, 0, length);
                         }
                     }
