@@ -5,7 +5,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import tech.kayys.cifr.engine.tool.*;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -89,7 +88,7 @@ public class GitBranchTool implements CifrTool {
         cmd.add(name);
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.directory(WORKSPACE_ROOT.toFile());
+        pb.directory(workspace.toFile());
         pb.redirectErrorStream(true);
         Process process = pb.start();
         String output = new String(process.getInputStream().readAllBytes());
@@ -105,7 +104,7 @@ public class GitBranchTool implements CifrTool {
             return new GitBranchResult(false, "Branch name required", List.of());
 
         ProcessBuilder pb = new ProcessBuilder("git", "switch", name);
-        pb.directory(WORKSPACE_ROOT.toFile());
+        pb.directory(workspace.toFile());
         pb.redirectErrorStream(true);
         Process process = pb.start();
         String output = new String(process.getInputStream().readAllBytes());
@@ -122,7 +121,7 @@ public class GitBranchTool implements CifrTool {
 
         List<String> cmd = new ArrayList<>(List.of("git", "branch", force ? "-D" : "-d", name));
         ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.directory(WORKSPACE_ROOT.toFile());
+        pb.directory(workspace.toFile());
         pb.redirectErrorStream(true);
         Process process = pb.start();
         String output = new String(process.getInputStream().readAllBytes());
