@@ -1,6 +1,7 @@
 package tech.kayys.cifr.engine.tool;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -58,8 +59,8 @@ class WorkspaceIsolationTest {
         Path link = workspace.resolve("outside-link");
         try {
             Files.createSymbolicLink(link, outside);
-        } catch (UnsupportedOperationException | SecurityException e) {
-            Assumptions.abort("Symbolic links are unavailable in this environment");
+        } catch (IOException | UnsupportedOperationException | SecurityException e) {
+            Assumptions.assumeTrue(false, "Symbolic links are unavailable in this environment");
         }
 
         ToolExecutionContext context = context(workspace);
