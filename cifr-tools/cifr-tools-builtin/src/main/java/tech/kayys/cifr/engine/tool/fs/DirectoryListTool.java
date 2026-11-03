@@ -13,7 +13,6 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class DirectoryListTool implements CifrTool {
 
-
     private static final int DEFAULT_MAX_DEPTH = 1;
     private static final int MAX_ENTRIES = 500;
 
@@ -43,15 +42,17 @@ public class DirectoryListTool implements CifrTool {
     public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
         return Uni.createFrom().item(() -> {
             try {
-                Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot(context);
                 String pathStr = (String) request.arguments().getOrDefault("path", ".");
+                Path dir = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                 String pattern = (String) request.arguments().getOrDefault("pattern", "*");
                 boolean recursive = Boolean.TRUE.equals(request.arguments().get("recursive"));
                 int maxDepth = ((Number) request.arguments().getOrDefault("maxDepth",
                     recursive ? 10 : DEFAULT_MAX_DEPTH)).intValue();
+                if (maxDepth < 1 || maxDepth > 64) {
+                    throw new IllegalArgumentException("maxDepth must be between 1 and 64");
+                }
                 boolean showHidden = Boolean.TRUE.equals(request.arguments().get("showHidden"));
 
-                Path dir = workspaceRoot.resolve(pathStr).normalize();
                 if (!Files.isDirectory(dir))
                     return new DirectoryListResult(pathStr, List.of(), false);
 
@@ -68,6 +69,10 @@ public class DirectoryListTool implements CifrTool {
                         .toList();
 
                     for (Path p : paths) {
+                        // Do not report symlink targets outside the workspace.
+                        WorkspaceResolver.resolveWorkspacePath(context,
+                                dir.relativize(p).toString().isEmpty() ? "." :
+                                Path.of(pathStr).resolve(dir.relativize(p)).toString());
                         if (entries.size() >= MAX_ENTRIES) { truncated = true; break; }
                         boolean isDir = Files.isDirectory(p);
                         BasicFileAttributes attrs = Files.readAttributes(p, BasicFileAttributes.class);
