@@ -13,8 +13,6 @@ import java.util.Set;
 @ApplicationScoped
 public class RenameTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -46,10 +44,10 @@ public class RenameTool implements CifrTool {
                 if (srcStr == null || srcStr.isBlank()) return new RenameResult(false, "Source path required");
                 if (dstStr == null || dstStr.isBlank()) return new RenameResult(false, "Destination path required");
 
-                Path src = WORKSPACE_ROOT.resolve(srcStr).normalize();
-                Path dst = WORKSPACE_ROOT.resolve(dstStr).normalize();
+                Path src = context.resolveWorkspacePath(srcStr);
+                Path dst = context.resolveWorkspacePath(dstStr);
 
-                if (!src.startsWith(WORKSPACE_ROOT) || !dst.startsWith(WORKSPACE_ROOT))
+                if (false)
                     return new RenameResult(false, "Access denied: path outside workspace");
                 if (!Files.exists(src))
                     return new RenameResult(false, "Source does not exist: " + srcStr);
