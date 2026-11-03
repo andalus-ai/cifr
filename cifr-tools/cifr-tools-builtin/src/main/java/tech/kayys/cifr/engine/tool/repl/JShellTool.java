@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -26,8 +27,7 @@ public class JShellTool implements CifrTool {
     @Inject
     CifrHarnessBridge harnessBridge;
 
-    private JShellImpl sharedSession;
-    private final Object sessionLock = new Object();
+    private final Map<String, JShellImpl> sharedSessions = new ConcurrentHashMap<>();
 
 
     @Override
@@ -67,7 +67,7 @@ public class JShellTool implements CifrTool {
             try {
                 JShellImpl.Result result;
                 if (useSession) {
-                    result = evaluateInSharedSession(code, timeoutMs);
+                    result = evaluateInSharedSession(code, timeoutMs, context.workspaceId());
                 } else {
                     result = evaluateInFreshSession(code, timeoutMs);
                 }
@@ -89,13 +89,12 @@ public class JShellTool implements CifrTool {
         }
     }
 
-    private JShellImpl.Result evaluateInSharedSession(String code, int timeoutMs) {
-        synchronized (sessionLock) {
-            if (sharedSession == null) {
-                sharedSession = new JShellImpl();
-            }
-            return withTimeout(() -> sharedSession.evaluate(code), timeoutMs);
+    private JShellImpl.Result evaluateInSharedSession(String code, int timeoutMs, String workspaceId) {
+        if (workspaceId == null || workspaceId.isBlank()) {
+            return JShellImpl.Result.failure("Workspace identity is required for a persistent JShell session");
         }
+        JShellImpl session = sharedSessions.computeIfAbsent(workspaceId, ignored -> new JShellImpl());
+        return withTimeout(() -> session.evaluate(code), timeoutMs);
     }
 
     private JShellImpl.Result withTimeout(java.util.concurrent.Callable<JShellImpl.Result> task, int timeoutMs) {
