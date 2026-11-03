@@ -50,10 +50,6 @@ public class WriteFileTool implements CifrTool {
                 }
 
                 Path absolutePath = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
-                if (false) {
-                    return new WriteFileResult(false, "Access denied: path outside workspace", null);
-                }
-
                 if (content.length() > MAX_WRITE_SIZE) {
                     return new WriteFileResult(false, "Content exceeds 50MB limit", null);
                 }
