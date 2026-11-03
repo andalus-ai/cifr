@@ -18,7 +18,7 @@ public class TemplateEngineTool implements CifrTool {
     private static final Pattern TEMPLATE_VARIABLE = Pattern.compile("\\{\\{\\s*(\\w+)\\s*\\}\\}");
     private static final Pattern TEMPLATE_CONDITIONAL = Pattern.compile("\\{\\{\\s*#if\\s+(\\w+)\\s*\\}\\}(.*?)\\{\\{\\s*\\/if\\s*\\}\\}", Pattern.DOTALL);
 
-    private final Map<String, String> templateCache = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, String>> templateCache = new ConcurrentHashMap<>();
 
     @Override
     public ToolDescriptor descriptor() {
@@ -55,8 +55,8 @@ public class TemplateEngineTool implements CifrTool {
 
                 return switch (action.toLowerCase()) {
                     case "render" -> renderTemplate(request, context);
-                    case "register" -> registerTemplate(request);
-                    case "list" -> listTemplates();
+                    case "register" -> registerTemplate(request, context);
+                    case "list" -> listTemplates(context);
                     default -> new TemplateResult(false, "Unknown action: " + action, null);
                 };
             } catch (Exception e) {
@@ -73,9 +73,10 @@ public class TemplateEngineTool implements CifrTool {
             Map<String, Object> variables = (Map<String, Object>) request.arguments().getOrDefault("variables", Map.of());
             String destination = (String) request.arguments().get("destination");
 
+            Map<String, String> workspaceTemplates = templatesFor(context);
             String raw;
-            if (templateName != null && templateCache.containsKey(templateName)) {
-                raw = templateCache.get(templateName);
+            if (templateName != null && workspaceTemplates.containsKey(templateName)) {
+                raw = workspaceTemplates.get(templateName);
             } else if (templateContent != null) {
                 raw = templateContent;
             } else {
@@ -100,18 +101,26 @@ public class TemplateEngineTool implements CifrTool {
         }
     }
 
-    private TemplateResult registerTemplate(ToolRequest request) {
+    private TemplateResult registerTemplate(ToolRequest request, ToolExecutionContext context) {
         String name = (String) request.arguments().get("templateName");
         String content = (String) request.arguments().get("template");
         if (name == null || content == null) {
             return new TemplateResult(false, "templateName and template content required", null);
         }
-        templateCache.put(name, content);
+        templatesFor(context).put(name, content);
         return new TemplateResult(true, "Template registered: " + name, content);
     }
 
-    private TemplateResult listTemplates() {
-        return new TemplateResult(true, "Registered templates: " + templateCache.keySet(), null);
+    private TemplateResult listTemplates(ToolExecutionContext context) {
+        return new TemplateResult(true, "Registered templates: " + templatesFor(context).keySet(), null);
+    }
+
+    private Map<String, String> templatesFor(ToolExecutionContext context) {
+        String workspaceId = context.workspaceId();
+        if (workspaceId == null || workspaceId.isBlank()) {
+            throw new IllegalStateException("Workspace identity is required for template operations");
+        }
+        return templateCache.computeIfAbsent(workspaceId, ignored -> new ConcurrentHashMap<>());
     }
 
     private String render(String template, Map<String, Object> variables) {
