@@ -155,7 +155,7 @@ public class CifrToolProvider implements ToolProvider {
                     List.of()
             );
 
-            String workspaceId = "workspace-unavailable";
+            String workspaceId = null;
             java.nio.file.Path workspaceRoot = null;
             Runnable cancellation = () -> {};
             if (ctx instanceof HarnessToolExecutionContext harnessContext) {
