@@ -94,7 +94,9 @@ public class JShellTool implements CifrTool {
             return JShellImpl.Result.failure("Workspace identity is required for a persistent JShell session");
         }
         JShellImpl session = sharedSessions.computeIfAbsent(workspaceId, ignored -> new JShellImpl());
-        return withTimeout(() -> session.evaluate(code), timeoutMs);
+        synchronized (session) {
+            return withTimeout(() -> session.evaluate(code), timeoutMs);
+        }
     }
 
     private JShellImpl.Result withTimeout(java.util.concurrent.Callable<JShellImpl.Result> task, int timeoutMs) {
