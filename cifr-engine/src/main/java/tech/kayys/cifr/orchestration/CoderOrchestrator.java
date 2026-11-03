@@ -95,7 +95,11 @@ public class CoderOrchestrator {
         if (!Files.isDirectory(root)) {
             throw new IllegalArgumentException("Workspace root is not an existing directory: " + root);
         }
-        return root.toString();
+        try {
+            return root.toRealPath().toString();
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("Unable to resolve workspace root: " + root, e);
+        }
     }
 
     private CodingIntent mapIntent(String content) {
@@ -116,7 +120,8 @@ public class CoderOrchestrator {
     }
 
     public Multi<AgentResponse> stream(AgentRequest request) {
-        String strategyId = (String) request.parameters().getOrDefault("strategy", "react");
+        String strategyId = request.parameters() != null
+                ? (String) request.parameters().getOrDefault("strategy", "react") : "react";
         String workspacePath = resolveWorkspacePath(request);
         tech.kayys.cifr.orchestration.strategy.ExecutionStrategy strategy = getStrategy(strategyId);
 
