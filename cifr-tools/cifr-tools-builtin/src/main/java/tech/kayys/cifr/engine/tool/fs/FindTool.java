@@ -14,7 +14,6 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class FindTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final int DEFAULT_LIMIT = 100;
 
     @Override
@@ -57,8 +56,8 @@ public class FindTool implements CifrTool {
                 String modifiedAfterStr = (String) request.arguments().get("modifiedAfter");
                 Instant modifiedAfter = modifiedAfterStr != null ? Instant.parse(modifiedAfterStr) : Instant.EPOCH;
 
-                Path searchRoot = WORKSPACE_ROOT.resolve(pathStr).normalize();
-                if (!searchRoot.startsWith(WORKSPACE_ROOT) || !Files.exists(searchRoot))
+                Path searchRoot = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
+                if (!Files.exists(searchRoot))
                     return new FindResult(pattern, List.of(), false);
 
                 PathMatcher nameMatcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
