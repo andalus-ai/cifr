@@ -45,7 +45,7 @@ public class ReadFileTool implements CifrTool {
                 }
 
                 Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot(context);
-                Path absPath = workspaceRoot.resolve(pathStr).normalize();
+                Path absPath = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                 if (!Files.exists(absPath) || Files.isDirectory(absPath)) {
                     return new ReadFileResult(pathStr, 0, 0, List.of(), new FileMetadata(0L, 0L, true));
                 }
