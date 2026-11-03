@@ -11,7 +11,6 @@ import java.util.*;
 @ApplicationScoped
 public class BatchWriteTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final int MAX_FILES_PER_BATCH = 100;
 
     @Override
@@ -52,7 +51,7 @@ public class BatchWriteTool implements CifrTool {
             try {
                 // Validate and backup
                 for (Map<String, Object> spec : fileSpecs) {
-                    Path abs = WORKSPACE_ROOT.resolve((String) spec.get("path")).normalize();
+                    Path abs = WorkspaceResolver.resolveWorkspacePath(context, (String) spec.get("path"));
                     if (!abs.startsWith(WORKSPACE_ROOT)) throw new SecurityException("Path outside workspace: " + spec.get("path"));
                     if (atomic && Files.exists(abs)) backups.put(abs, Files.readString(abs));
                 }
@@ -62,7 +61,7 @@ public class BatchWriteTool implements CifrTool {
                     String pathStr = (String) spec.get("path");
                     String content = (String) spec.getOrDefault("content", "");
                     boolean append = Boolean.TRUE.equals(spec.get("append"));
-                    Path abs = WORKSPACE_ROOT.resolve(pathStr).normalize();
+                    Path abs = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                     if (abs.getParent() != null) Files.createDirectories(abs.getParent());
                     if (append && Files.exists(abs)) {
                         Files.writeString(abs, content, StandardOpenOption.APPEND);
