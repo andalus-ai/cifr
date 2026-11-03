@@ -15,7 +15,6 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class TemplateEngineTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final Pattern TEMPLATE_VARIABLE = Pattern.compile("\\{\\{\\s*(\\w+)\\s*\\}\\}");
     private static final Pattern TEMPLATE_CONDITIONAL = Pattern.compile("\\{\\{\\s*#if\\s+(\\w+)\\s*\\}\\}(.*?)\\{\\{\\s*\\/if\\s*\\}\\}", Pattern.DOTALL);
 
@@ -55,7 +54,7 @@ public class TemplateEngineTool implements CifrTool {
                 String action = (String) request.arguments().get("action");
 
                 return switch (action.toLowerCase()) {
-                    case "render" -> renderTemplate(request);
+                    case "render" -> renderTemplate(request, context);
                     case "register" -> registerTemplate(request);
                     case "list" -> listTemplates();
                     default -> new TemplateResult(false, "Unknown action: " + action, null);
@@ -67,7 +66,7 @@ public class TemplateEngineTool implements CifrTool {
     }
 
     @SuppressWarnings("unchecked")
-    private TemplateResult renderTemplate(ToolRequest request) {
+    private TemplateResult renderTemplate(ToolRequest request, ToolExecutionContext context) {
         try {
             String templateContent = (String) request.arguments().get("template");
             String templateName = (String) request.arguments().get("templateName");
@@ -86,10 +85,7 @@ public class TemplateEngineTool implements CifrTool {
             String rendered = render(raw, variables);
 
             if (destination != null && !destination.isBlank()) {
-                Path destPath = WORKSPACE_ROOT.resolve(destination).normalize();
-                if (!destPath.startsWith(WORKSPACE_ROOT)) {
-                    return new TemplateResult(false, "Access denied: path outside workspace", null);
-                }
+                Path destPath = context.resolveWorkspacePath(destination);
                 if (destPath.getParent() != null) {
                     Files.createDirectories(destPath.getParent());
                 }
