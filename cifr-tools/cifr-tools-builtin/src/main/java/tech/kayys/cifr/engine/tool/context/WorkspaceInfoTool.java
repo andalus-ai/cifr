@@ -38,14 +38,10 @@ public class WorkspaceInfoTool implements CifrTool {
                 String pathStr = (String) request.arguments().get("path");
                 int depth = ((Number) request.arguments().getOrDefault("depth", 2)).intValue();
 
-                Path workspaceRoot = context.requireWorkspaceRoot();
+                Path workspaceRoot = context.resolveWorkspacePath(".");
                 Path targetPath = pathStr != null
                     ? context.resolveWorkspacePath(pathStr)
                     : workspaceRoot;
-
-                if (!targetPath.startsWith(workspaceRoot)) {
-                    return new WorkspaceInfoResult(false, "Access denied: path outside workspace", null);
-                }
 
                 if (!Files.exists(targetPath)) {
                     return new WorkspaceInfoResult(false, "Path does not exist: " + pathStr, null);
