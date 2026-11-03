@@ -74,6 +74,7 @@ public class SearchTool implements CifrTool {
                     .toList();
 
                 for (Path file : files) {
+                    context.resolveWorkspacePath(context.resolveWorkspacePath(".").relativize(file).toString());
                     if (matches.size() >= limit) {
                         truncated = true;
                         break;
