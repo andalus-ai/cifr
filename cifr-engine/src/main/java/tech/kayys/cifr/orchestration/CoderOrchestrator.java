@@ -16,6 +16,7 @@ import tech.kayys.cifr.engine.loop.CodingTask;
 import tech.kayys.andalus.extension.Id;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -57,7 +58,7 @@ public class CoderOrchestrator {
 
     public Uni<AgentResponse> execute(AgentRequest request) {
         CodingIntent intent = mapIntent(request.content());
-        String workspacePath = (String) request.parameters().getOrDefault("workspace_path", System.getProperty("user.dir"));
+        String workspacePath = resolveWorkspacePath(request);
         
         CodingTask task = new CodingTask(
                 Id.random().asString(),
@@ -76,6 +77,25 @@ public class CoderOrchestrator {
 
         List<Tool> tools = getResolvedTools(workspacePath);
         return codingLoop.execute(task, toolExecutor, tools);
+    }
+
+    private String resolveWorkspacePath(AgentRequest request) {
+        Object requested = request.parameters() != null ? request.parameters().get("workspace_path") : null;
+        String configured = requested instanceof String value && !value.isBlank()
+                ? value
+                : System.getProperty("cifr.workspace.root");
+        if (configured == null || configured.isBlank()) {
+            configured = System.getenv("CIFR_WORKSPACE_ROOT");
+        }
+        if (configured == null || configured.isBlank()) {
+            throw new IllegalArgumentException(
+                    "workspace_path is required (or configure cifr.workspace.root / CIFR_WORKSPACE_ROOT)");
+        }
+        Path root = Paths.get(configured).toAbsolutePath().normalize();
+        if (!Files.isDirectory(root)) {
+            throw new IllegalArgumentException("Workspace root is not an existing directory: " + root);
+        }
+        return root.toString();
     }
 
     private CodingIntent mapIntent(String content) {
@@ -97,7 +117,7 @@ public class CoderOrchestrator {
 
     public Multi<AgentResponse> stream(AgentRequest request) {
         String strategyId = (String) request.parameters().getOrDefault("strategy", "react");
-        String workspacePath = (String) request.parameters().getOrDefault("workspace_path", System.getProperty("user.dir"));
+        String workspacePath = resolveWorkspacePath(request);
         tech.kayys.cifr.orchestration.strategy.ExecutionStrategy strategy = getStrategy(strategyId);
 
         List<Tool> tools = getResolvedTools(workspacePath);
