@@ -3,7 +3,6 @@ package tech.kayys.cifr.engine.patch;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import tech.kayys.cifr.engine.repo.GitRepositoryService;
 import tech.kayys.cifr.engine.tool.ToolExecutionContext;
 
 import java.io.IOException;
@@ -43,15 +42,14 @@ public class PatchApplierTest {
 
         PatchValidator validator = new PatchValidator();
         MutationStore store = new MutationStore();
-        GitRepositoryService gitService = new GitRepositoryService();
         DefaultWorkspaceGuard guard = new DefaultWorkspaceGuard();
-        guard.gitService = gitService;
+        guard.gitService = null;
 
         PatchApplier applier = new PatchApplier();
         applier.validator = validator;
         applier.mutationStore = store;
         applier.workspaceGuard = guard;
-        applier.gitService = gitService;
+        applier.gitService = null;
 
         PatchEdit edit = new PatchEdit("expiresAt > now\n", "expiresAt >= now\n");
         PatchOperation patch = new PatchOperation("patch-test-1", "test-temp/test.txt",
