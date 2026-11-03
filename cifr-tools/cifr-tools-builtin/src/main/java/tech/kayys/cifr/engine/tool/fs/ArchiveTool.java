@@ -95,6 +95,7 @@ public class ArchiveTool implements CifrTool {
                 destPath = workspaceRoot.resolve(baseName + ".zip");
             }
 
+            destPath = context.resolveWorkspacePath(workspaceRoot.relativize(destPath).toString());
             if (destPath.getParent() != null) {
                 Files.createDirectories(destPath.getParent());
             }
@@ -155,8 +156,10 @@ public class ArchiveTool implements CifrTool {
             if (destPath == null) {
                 destPath = workspaceRoot.resolve(archivePath.getFileName().toString().replaceAll("\\.[^.]+$", ""));
             }
+            destPath = context.resolveWorkspacePath(workspaceRoot.relativize(destPath).toString());
             Files.createDirectories(destPath);
 
+            long totalExtractedBytes = 0;
             try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(Files.newInputStream(archivePath), BUFFER_SIZE))) {
                 byte[] buffer = new byte[BUFFER_SIZE];
                 ZipEntry entry;
@@ -175,10 +178,9 @@ public class ArchiveTool implements CifrTool {
                     }
                     try (FileOutputStream fos = new FileOutputStream(target.toFile())) {
                         int length;
-                        long extractedBytes = 0;
                         while ((length = zis.read(buffer)) > 0) {
-                            extractedBytes += length;
-                            if (extractedBytes > MAX_ARCHIVE_SIZE) {
+                            totalExtractedBytes += length;
+                            if (totalExtractedBytes > MAX_ARCHIVE_SIZE) {
                                 throw new SecurityException("Archive extraction exceeded the size limit");
                             }
                             fos.write(buffer, 0, length);
