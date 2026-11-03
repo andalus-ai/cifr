@@ -1,38 +1,61 @@
 package tech.kayys.cifr.engine.tool;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** Resolves the workspace from an invocation context, then explicit process configuration. */
+/** Resolves and validates paths against the workspace attached to one tool invocation. */
 public final class WorkspaceResolver {
 
     private WorkspaceResolver() {}
 
     public static Path resolveWorkspaceRoot(ToolExecutionContext context) {
-        if (context != null && context.workspaceRoot() != null && context.workspaceRoot().isPresent()) {
-            Path root = context.workspaceRoot().get().toAbsolutePath().normalize();
-            if (Files.isDirectory(root)) return root;
+        if (context == null || context.workspaceRoot() == null || context.workspaceRoot().isEmpty()) {
+            throw new IllegalStateException("Tool invocation has no explicit workspace root");
+        }
+        Path root = context.workspaceRoot().get().toAbsolutePath().normalize();
+        if (!Files.isDirectory(root)) {
             throw new IllegalArgumentException("Workspace root is not an existing directory: " + root);
         }
-        return resolveConfiguredWorkspaceRoot();
+        try {
+            return root.toRealPath();
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot resolve workspace root: " + root, e);
+        }
     }
 
-    /** Compatibility fallback for tools invoked outside a workspace-aware request. */
-    public static Path resolveWorkspaceRoot() {
-        return resolveConfiguredWorkspaceRoot();
-    }
-
-    private static Path resolveConfiguredWorkspaceRoot() {
-        String env = System.getenv("WORKSPACE_ROOT");
-        if (env != null && !env.isBlank()) {
-            Path root = Path.of(env).toAbsolutePath().normalize();
-            if (Files.isDirectory(root)) return root;
+    /**
+     * Resolves a model-supplied relative path without permitting traversal or symlink escape.
+     * Existing targets are checked by their real path; for new targets, the nearest existing
+     * ancestor is checked so a symlinked parent cannot escape the workspace.
+     */
+    public static Path resolveWorkspacePath(ToolExecutionContext context, String relativePath) {
+        Path root = resolveWorkspaceRoot(context);
+        if (relativePath == null || relativePath.isBlank()) {
+            throw new IllegalArgumentException("Workspace-relative path is required");
         }
-        String property = System.getProperty("workspace.root");
-        if (property != null && !property.isBlank()) {
-            Path root = Path.of(property).toAbsolutePath().normalize();
-            if (Files.isDirectory(root)) return root;
+        Path supplied = Path.of(relativePath);
+        if (supplied.isAbsolute()) {
+            throw new IllegalArgumentException("Absolute paths are not allowed: " + relativePath);
         }
-        return Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        Path candidate = root.resolve(supplied).normalize();
+        if (!candidate.startsWith(root)) {
+            throw new IllegalArgumentException("Path escapes workspace: " + relativePath);
+        }
+        try {
+            Path existing = candidate;
+            while (existing != null && !Files.exists(existing)) {
+                existing = existing.getParent();
+            }
+            if (existing == null || !existing.toRealPath().startsWith(root)) {
+                throw new IllegalArgumentException("Path escapes workspace through a symlink: " + relativePath);
+            }
+            if (Files.exists(candidate) && !candidate.toRealPath().startsWith(root)) {
+                throw new IllegalArgumentException("Path escapes workspace through a symlink: " + relativePath);
+            }
+            return candidate;
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot safely resolve workspace path: " + relativePath, e);
+        }
     }
 }
