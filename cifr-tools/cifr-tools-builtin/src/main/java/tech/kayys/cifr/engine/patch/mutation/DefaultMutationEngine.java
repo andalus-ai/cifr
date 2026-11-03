@@ -95,7 +95,7 @@ public class DefaultMutationEngine implements MutationEngine {
                 throw new RuntimeException("Failed applying file edits, rolled back: " + e.getMessage(), e);
             }
 
-            rollbackJournal.put(mutationId.value(), new RollbackEntry(root, Map.copyOf(backups)));
+            rollbackJournal.put(mutationId.value(), new RollbackEntry(root, Collections.unmodifiableMap(new HashMap<>(backups))));
             WorkspaceFingerprint fingerprint = new WorkspaceFingerprint(
                     "repo-hash-" + mutationId.value(), "1.0", "cfg-hash-" + mutationId.value());
             return new MutationResult(mutationId, new ChangeSet(records), evidence, fingerprint);
