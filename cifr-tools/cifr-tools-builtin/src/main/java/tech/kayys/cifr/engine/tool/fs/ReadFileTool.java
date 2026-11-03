@@ -15,9 +15,6 @@ import java.util.Set;
 
 @ApplicationScoped
 public class ReadFileTool implements CifrTool {
-
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -47,8 +44,7 @@ public class ReadFileTool implements CifrTool {
                     return new ReadFileResult("", 0, 0, List.of(), new FileMetadata(0L, 0L, true));
                 }
 
-                Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot();
-                Path absPath = workspaceRoot.resolve(pathStr).normalize();
+                Path absPath = context.resolveWorkspacePath(pathStr);
                 if (!Files.exists(absPath) || Files.isDirectory(absPath)) {
                     return new ReadFileResult(pathStr, 0, 0, List.of(), new FileMetadata(0L, 0L, true));
                 }

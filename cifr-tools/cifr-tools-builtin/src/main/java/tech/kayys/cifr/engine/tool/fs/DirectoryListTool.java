@@ -43,7 +43,7 @@ public class DirectoryListTool implements CifrTool {
     public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
         return Uni.createFrom().item(() -> {
             try {
-                Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot();
+                Path workspaceRoot = context.requireWorkspaceRoot();
                 String pathStr = (String) request.arguments().getOrDefault("path", ".");
                 String pattern = (String) request.arguments().getOrDefault("pattern", "*");
                 boolean recursive = Boolean.TRUE.equals(request.arguments().get("recursive"));
