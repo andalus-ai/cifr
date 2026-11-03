@@ -2,6 +2,7 @@ package tech.kayys.cifr.engine.tool;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.LinkOption;
 import java.util.Optional;
 import tech.kayys.cifr.engine.loop.CodingPolicy;
 
@@ -50,19 +51,22 @@ public record ToolExecutionContext(
         try {
         Path root = requireWorkspaceRoot().toRealPath();
         Path supplied = Path.of(suppliedPath);
+        if (supplied.isAbsolute()) {
+            throw new SecurityException("Absolute paths are not allowed: " + suppliedPath);
+        }
         Path candidate = root.resolve(supplied).normalize();
         if (!candidate.startsWith(root)) {
             throw new SecurityException("Path escapes workspace: " + suppliedPath);
         }
 
         Path existing = candidate;
-        while (existing != null && !Files.exists(existing)) {
+        while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) {
             existing = existing.getParent();
         }
         if (existing == null || !existing.toRealPath().startsWith(root)) {
             throw new SecurityException("Path resolves outside workspace: " + suppliedPath);
         }
-        if (Files.exists(candidate) && !candidate.toRealPath().startsWith(root)) {
+        if (Files.exists(candidate, LinkOption.NOFOLLOW_LINKS) && !candidate.toRealPath().startsWith(root)) {
             throw new SecurityException("Path resolves outside workspace: " + suppliedPath);
         }
         return candidate;
