@@ -18,7 +18,6 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class BatchPatchTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
 
     @Override
     public ToolDescriptor descriptor() {
@@ -59,7 +58,7 @@ public class BatchPatchTool implements CifrTool {
                 for (Map<String, Object> spec : patchSpecs) {
                     String pathStr = (String) spec.get("path");
                     if (pathStr == null) throw new IllegalArgumentException("Missing path in patch spec");
-                    Path abs = WORKSPACE_ROOT.resolve(pathStr).normalize();
+                    Path abs = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                     if (!abs.startsWith(WORKSPACE_ROOT)) throw new SecurityException("Path outside workspace: " + pathStr);
                     if (!Files.exists(abs)) throw new NoSuchFileException("File not found: " + pathStr);
                     if (!backups.containsKey(abs)) backups.put(abs, Files.readString(abs));
