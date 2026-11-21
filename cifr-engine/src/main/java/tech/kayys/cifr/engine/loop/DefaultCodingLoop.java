@@ -93,7 +93,15 @@ public class DefaultCodingLoop implements CodingLoop {
                     TransitionResult transition = stateMachine.transition(state.getCifrState(), event);
                     if (!transition.isValid()) {
                         log.severe("State machine transition invalid: " + transition.reason());
-                        stateStore.fail(state.getTask().sessionId(), new RuntimeException(transition.reason()));
+                        CifrState failedState = new CifrState(
+                                state.getCifrState().executionId(),
+                                AgentPhase.FAILED,
+                                state.getCifrState().plan(),
+                                state.getCifrState().progress(),
+                                state.getCifrState().workspaceRevision(),
+                                state.getCifrState().outcome());
+                        state.setCifrState(failedState);
+                        stateStore.fail(state.getTask().sessionId(), new IllegalStateException(transition.reason()));
                         return Uni.createFrom().item(state);
                     }
                     
@@ -107,7 +115,12 @@ public class DefaultCodingLoop implements CodingLoop {
                     );
                     
                     if (isTerminalPhase(transition.nextState().phase())) {
-                        stateStore.complete(state.getTask().sessionId(), null);
+                        if (transition.nextState().phase() == AgentPhase.COMPLETED) {
+                            stateStore.complete(state.getTask().sessionId(), null);
+                        } else {
+                            stateStore.fail(state.getTask().sessionId(),
+                                    new IllegalStateException("Coding execution terminated in " + transition.nextState().phase()));
+                        }
                         return Uni.createFrom().item(state);
                     }
                     
