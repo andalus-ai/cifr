@@ -212,8 +212,8 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
 
             // Extract symbols if source code
             if ("java".equals(lang) || "dart".equals(lang) || "typescript".equals(lang) || "python".equals(lang)) {
-                extractSymbols(relative, content, symbolsCount, workspaceId);
-                extractDependencies(relative, content, depsCount, workspaceId);
+                extractSymbols(relative, content, workspaceId, symbolsCount);
+                extractDependencies(relative, content, depsCount);
             }
 
         } catch (IOException e) {
@@ -221,8 +221,8 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
         }
     }
 
-    private void extractSymbols(Path relative, String content, AtomicInteger symbolsCount, String workspaceId) {
-        String[] lines = content.split("\\R");
+    private void extractSymbols(Path relative, String content, String workspaceId, AtomicInteger symbolsCount) {
+        String[] lines = content.split("\n");
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.startsWith("//") || line.startsWith("/*") || line.startsWith("*")) {

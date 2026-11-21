@@ -34,12 +34,14 @@ public class DefaultRepositoryQueryService implements RepositoryQueryService {
         if (query == null || query.name() == null || query.name().isBlank()) {
             return Collections.emptyList();
         }
+        final SymbolInfo symbol;
         try {
-            SymbolInfo symbol = symbolIndex.getSymbol(SymbolId.of(query.name())).await().indefinitely();
-            if (symbol != null) {
-                return List.of(RankedResult.of(symbol, 1.0, RankingReason.EXACT_NAME_MATCH));
-            }
-        } catch (Exception ignored) {
+            symbol = symbolIndex.getSymbol(SymbolId.of(query.name())).await().indefinitely();
+        } catch (Exception e) {
+            throw new IllegalStateException("Symbol lookup failed for " + query.name(), e);
+        }
+        if (symbol != null) {
+            return List.of(RankedResult.of(symbol, 1.0, RankingReason.EXACT_NAME_MATCH));
         }
         return Collections.emptyList();
     }
@@ -49,19 +51,20 @@ public class DefaultRepositoryQueryService implements RepositoryQueryService {
         if (query == null || query.symbolId() == null) {
             return Collections.emptyList();
         }
+        ReferenceRequest req = new ReferenceRequest(
+                SymbolId.of(query.symbolId()), query.limit(), query.workspaceId());
+        final List<Reference> refs;
         try {
-            ReferenceRequest req = new ReferenceRequest(SymbolId.of(query.symbolId()), query.limit());
-            List<Reference> refs = referenceIndex.getReferences(req).await().indefinitely();
-            if (refs != null) {
-                List<RankedResult<Reference>> results = new ArrayList<>();
-                for (Reference ref : refs) {
-                    results.add(RankedResult.of(ref, 0.9, RankingReason.SYMBOL_REFERENCE));
-                }
-                return results;
-            }
-        } catch (Exception ignored) {
+            refs = referenceIndex.getReferences(req).await().indefinitely();
+        } catch (Exception e) {
+            throw new IllegalStateException("Reference lookup failed for " + query.symbolId(), e);
         }
-        return Collections.emptyList();
+        if (refs == null || refs.isEmpty()) return Collections.emptyList();
+        List<RankedResult<Reference>> results = new ArrayList<>();
+        for (Reference ref : refs) {
+            results.add(RankedResult.of(ref, 0.9, RankingReason.SYMBOL_REFERENCE));
+        }
+        return results;
     }
 
     @Override
