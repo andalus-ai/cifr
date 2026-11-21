@@ -25,9 +25,15 @@ public interface SymbolIndex {
     }
 
     void registerSymbol(SymbolInfo info);
+
+    /** Remove cached symbols for one file in one workspace. */
+    default void removeFile(Path file, String workspaceId) { }
+
     void clear();
 
     default void clearWorkspace(String workspaceId) {
         clear();
     }
+
+    default void invalidateResolverCache(String workspaceId) { }
 }

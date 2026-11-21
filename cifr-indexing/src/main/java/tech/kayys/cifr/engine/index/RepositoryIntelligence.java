@@ -15,6 +15,12 @@ public interface RepositoryIntelligence {
 
     Uni<tech.kayys.cifr.engine.index.symbol.SymbolInfo> symbol(tech.kayys.cifr.engine.index.symbol.SymbolId id);
 
+    /** Workspace-scoped symbol lookup; legacy implementations retain the original behavior. */
+    default Uni<tech.kayys.cifr.engine.index.symbol.SymbolInfo> symbol(
+            tech.kayys.cifr.engine.index.symbol.SymbolId id, String workspaceId) {
+        return symbol(id);
+    }
+
     // Future milestones will add:
     Uni<java.util.List<tech.kayys.cifr.engine.index.reference.Reference>> references(tech.kayys.cifr.engine.index.reference.ReferenceRequest request);
     Uni<java.util.List<tech.kayys.cifr.engine.index.dependency.Dependency>> dependencies(tech.kayys.cifr.engine.index.dependency.DependencyRequest request);

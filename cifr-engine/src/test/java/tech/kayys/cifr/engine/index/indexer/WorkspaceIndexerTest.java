@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tech.kayys.cifr.engine.index.DefaultFileIndex;
 import tech.kayys.cifr.engine.index.dependency.DefaultDependencyIndex;
+import tech.kayys.cifr.engine.index.dependency.DependencyRequest;
 import tech.kayys.cifr.engine.index.relation.DefaultRelationIndex;
 import tech.kayys.cifr.engine.index.symbol.DefaultSymbolIndex;
 import tech.kayys.cifr.engine.index.symbol.SymbolId;
@@ -112,4 +113,46 @@ public class WorkspaceIndexerTest {
         assertNotNull(valSym);
         assertEquals("TokenValidator", valSym.name());
     }
+    @Test
+    void testRemovedFileClearsAllWorkspaceIndexData() throws IOException {
+        Path srcDir = tempWorkspace.resolve("src");
+        Files.createDirectories(srcDir);
+        Path file = srcDir.resolve("TokenValidator.java");
+        Files.writeString(file,
+            "import java.util.List;\\n" +
+            "public class TokenValidator {\\n" +
+            "    public boolean isValid(String token) { return true; }\\n" +
+            "}\\n");
+
+        workspaceIndexer.index(tempWorkspace, "proj-remove").await().indefinitely();
+        assertEquals(1, fileIndex.getCurrentIndex("proj-remove").await().indefinitely().size());
+        assertFalse(symbolIndex.searchSymbols("TokenValidator", "proj-remove").await().indefinitely().isEmpty());
+        assertFalse(dependencyIndex.getDependencies(new DependencyRequest(null, null, "proj-remove"))
+                .await().indefinitely().isEmpty());
+
+        workspaceIndexer.removeFile(Path.of("src/TokenValidator.java"), "proj-remove").await().indefinitely();
+
+        assertTrue(fileIndex.getCurrentIndex("proj-remove").await().indefinitely().isEmpty());
+        assertTrue(symbolIndex.searchSymbols("TokenValidator", "proj-remove").await().indefinitely().isEmpty());
+        assertTrue(dependencyIndex.getDependencies(new DependencyRequest(null, null, "proj-remove"))
+                .await().indefinitely().isEmpty());
+    }
+
+    @Test
+    void testFullScanReconcilesFilesDeletedFromDisk() throws IOException {
+        Path srcDir = tempWorkspace.resolve("src");
+        Files.createDirectories(srcDir);
+        Path file = srcDir.resolve("Removed.java");
+        Files.writeString(file, "public class Removed {}\\n");
+
+        workspaceIndexer.index(tempWorkspace, "proj-rescan").await().indefinitely();
+        assertFalse(fileIndex.getCurrentIndex("proj-rescan").await().indefinitely().isEmpty());
+
+        Files.delete(file);
+        workspaceIndexer.index(tempWorkspace, "proj-rescan").await().indefinitely();
+
+        assertTrue(fileIndex.getCurrentIndex("proj-rescan").await().indefinitely().isEmpty());
+        assertTrue(symbolIndex.searchSymbols("Removed", "proj-rescan").await().indefinitely().isEmpty());
+    }
+
 }

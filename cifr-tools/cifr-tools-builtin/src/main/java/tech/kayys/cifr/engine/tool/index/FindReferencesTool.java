@@ -43,7 +43,7 @@ public class FindReferencesTool implements CifrTool {
         String name = (String) request.arguments().get("name");
         
         SymbolId target = new SymbolId(fqn, name, null);
-        ReferenceRequest refReq = new ReferenceRequest(target, 100);
+        ReferenceRequest refReq = new ReferenceRequest(target, 100, context.workspaceId());
         
         return intelligence.references(refReq).map(refs -> {
             String resultText = refs.stream()

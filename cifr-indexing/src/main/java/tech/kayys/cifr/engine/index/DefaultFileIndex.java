@@ -12,6 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -20,7 +21,10 @@ public class DefaultFileIndex implements FileIndex {
     // Relative paths are unique only within a workspace.
     private final Map<String, FileRecord> fileRecords = new ConcurrentHashMap<>();
 
-    @Inject FileClassifier classifier;
+    private final Map<String, FileRecord> fileRecords = new ConcurrentHashMap<>();
+
+    @Inject
+    FileClassifier classifier;
 
     @Override
     public Uni<WorkspaceFingerprint> computeFingerprint(Path workspaceRoot) {
@@ -85,6 +89,34 @@ public class DefaultFileIndex implements FileIndex {
     public void registerFile(FileRecord record) {
         if (record == null || record.path() == null || record.workspaceId() == null || record.workspaceId().isBlank()) return;
         fileRecords.put(fileKey(record.workspaceId(), record.path()), record);
+    }
+
+    @Override
+    public void removeFile(Path file, String workspaceId) {
+        if (file == null || workspaceId == null || workspaceId.isBlank()) return;
+        Path normalized = file.normalize();
+        fileRecords.entrySet().removeIf(entry -> {
+            FileRecord record = entry.getValue();
+            if (!workspaceId.equals(record.workspaceId()) || record.path() == null) return false;
+            Path indexed = record.path().normalize();
+            return indexed.equals(normalized);
+        });
+    }
+
+    @Override
+    public List<Path> removeMissingFiles(String workspaceId, Set<Path> presentFiles) {
+        if (workspaceId == null || workspaceId.isBlank()) return List.of();
+        Set<Path> present = presentFiles == null ? Set.of() : presentFiles;
+        List<Path> removed = new ArrayList<>();
+        fileRecords.entrySet().removeIf(entry -> {
+            FileRecord record = entry.getValue();
+            if (!workspaceId.equals(record.workspaceId()) || record.path() == null) return false;
+            Path path = record.path().normalize();
+            if (present.contains(path)) return false;
+            removed.add(path);
+            return true;
+        });
+        return removed;
     }
 
     @Override
