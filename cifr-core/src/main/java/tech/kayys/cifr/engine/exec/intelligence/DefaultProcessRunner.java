@@ -54,15 +54,16 @@ public class DefaultProcessRunner implements ProcessRunner {
 
             process = builder.start();
             processId = Long.toString(process.pid());
-            running = new RunningProcess(process);
+            final Process startedProcess = process;
+            running = new RunningProcess(startedProcess);
             activeProcesses.put(processId, running);
 
             long outputLimit = Math.max(0L, budget.maxOutputBytes());
             AtomicLong capturedBytes = new AtomicLong();
             CompletableFuture<String> stdout = CompletableFuture.supplyAsync(
-                    () -> readStream(process.getInputStream(), outputLimit, capturedBytes));
+                    () -> readStream(startedProcess.getInputStream(), outputLimit, capturedBytes));
             CompletableFuture<String> stderr = CompletableFuture.supplyAsync(
-                    () -> readStream(process.getErrorStream(), outputLimit, capturedBytes));
+                    () -> readStream(startedProcess.getErrorStream(), outputLimit, capturedBytes));
 
             boolean finished = process.waitFor(budget.timeout().toMillis(), TimeUnit.MILLISECONDS);
             Duration duration = Duration.between(start, Instant.now());
@@ -123,18 +124,24 @@ public class DefaultProcessRunner implements ProcessRunner {
             int count;
             boolean truncated = false;
             while ((count = input.read(buffer)) != -1) {
-                long remaining = limit == 0 ? count : Math.max(0L, limit - totalCaptured.get());
-                int accepted = (int) Math.min(count, remaining);
-                if (accepted > 0) {
-                    output.write(buffer, 0, accepted);
-                    totalCaptured.addAndGet(accepted);
-                }
+                int accepted = reserveBytes(totalCaptured, limit, count);
+                if (accepted > 0) output.write(buffer, 0, accepted);
                 if (accepted < count) truncated = true;
             }
             String text = output.toString(StandardCharsets.UTF_8);
             return truncated ? text + "\n[OUTPUT TRUNCATED]" : text;
         } catch (Exception e) {
             return "Error reading process output: " + e.getMessage();
+        }
+    }
+
+    private static int reserveBytes(AtomicLong captured, long limit, int requested) {
+        if (limit == 0) return requested;
+        while (true) {
+            long current = captured.get();
+            long available = Math.max(0L, limit - current);
+            int accepted = (int) Math.min(requested, available);
+            if (captured.compareAndSet(current, current + accepted)) return accepted;
         }
     }
 
