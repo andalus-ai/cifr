@@ -98,7 +98,7 @@
                     <version>${jandex.maven.plugin.version}</version>
                 </plugin>
                 <plugin>
-                    <groupId>io.quarkus.platform</groupId>
+                    <groupId>io.quarkus</groupId>
                     <artifactId>quarkus-maven-plugin</artifactId>
                     <version>${quarkus.platform.version}</version>
                 </plugin>
