@@ -52,7 +52,7 @@ public class ClosedLoopVerificationTest {
         contextEngine = new DefaultContextEngine(symbolIndex, fileIndex, dependencyIndex, relationIndex, new DefaultContextBudgeter());
         workspaceIndexer = new DefaultWorkspaceIndexer(fileIndex, symbolIndex, dependencyIndex, relationIndex);
 
-        closedLoopCoder = new DefaultClosedLoopCoder(contextEngine, mutationEngine, verificationEngine, workspaceIndexer, fileIndex);
+        closedLoopCoder = new DefaultClosedLoopCoder();
     }
 
     @AfterEach
@@ -121,7 +121,7 @@ public class ClosedLoopVerificationTest {
     }
 
     @Test
-    void testClosedLoopExecutionSuccess() throws IOException {
+    void testClosedLoopDoesNotReportSuccessWithoutAProposal() throws IOException {
         Path src = tempWorkspace.resolve("src");
         Files.createDirectories(src);
 
@@ -140,8 +140,9 @@ public class ClosedLoopVerificationTest {
 
         RepairResult result = closedLoopCoder.executeLoop(plan, 3, tempWorkspace, "proj-1").await().indefinitely();
 
-        assertTrue(result.success());
-        assertEquals(1, result.totalAttempts());
-        assertNotNull(result.finalFingerprint());
+        assertFalse(result.success(), "A repair without a generated proposal must not report success");
+        assertEquals(0, result.totalAttempts());
+        assertTrue(result.message().contains("no edit proposal"));
+        assertEquals("// original content\npublic class Main {}\n", Files.readString(target));
     }
 }

@@ -109,13 +109,12 @@ public final class DefaultPhaseHandlers {
                     .map(decision -> {
                         if (decision.isComplete()) {
                             return new AgentEvent.ReviewCompleted();
-                        } else {
-                            if (state.getIteration() >= state.getTask().policy().maxRepairIterations()) {
-                                return new AgentEvent.TaskFailed();
-                            }
-                            state.incrementIteration();
-                            return new AgentEvent.TaskFailed();
                         }
+                        if (state.getIteration() >= state.getTask().policy().maxRepairIterations()) {
+                            return new AgentEvent.TaskExhausted();
+                        }
+                        state.incrementIteration();
+                        return new AgentEvent.TaskFailed();
                     });
         }
     }
@@ -168,7 +167,7 @@ public final class DefaultPhaseHandlers {
 
         @Override
         public Uni<AgentEvent> handle(CodingState state, AgentToolExecutor executor, List<Tool> tools) {
-            return Uni.createFrom().item(new AgentEvent.TaskSucceeded());
+            return Uni.createFrom().item(new AgentEvent.PlanCreated());
         }
     }
 }

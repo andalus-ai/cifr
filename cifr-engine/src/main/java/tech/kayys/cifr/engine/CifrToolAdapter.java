@@ -20,7 +20,11 @@ import tech.kayys.andalus.tool.ToolResult;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,12 +32,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-import java.util.UUID;
 
 /** Adapts a CIFR tool to the Andalus Tool SPI while preserving invocation workspace scope. */
 public class CifrToolAdapter extends BaseResource implements Tool {
@@ -87,14 +85,16 @@ public class CifrToolAdapter extends BaseResource implements Tool {
             return CompletableFuture.failedFuture(
                     new IllegalStateException("CIFR tool execution requires an existing explicit workspace root"));
         }
+
         Map<String, Object> args = invocation != null && invocation.arguments() != null
                 ? invocation.arguments() : Collections.emptyMap();
-        ToolRequest req = new ToolRequest(invocation != null ? invocation.name() : "",
-                args, Optional.empty(), Collections.emptyList());
-        String workspaceId = workspaceRoot.toString();
-        Map<String, Object> args = invocation != null && invocation.arguments() != null ? invocation.arguments() : Collections.emptyMap();
-        ToolRequest req = new ToolRequest(invocation != null ? invocation.name() : "", args, Optional.empty(), Collections.emptyList());
-        ToolExecutionContext execCtx = ToolExecutionContext.of(
+        ToolRequest request = new ToolRequest(
+                invocation != null ? invocation.name() : "",
+                args,
+                Optional.empty(),
+                Collections.emptyList());
+
+        ToolExecutionContext executionContext = ToolExecutionContext.of(
                 "task-" + UUID.randomUUID(),
                 workspaceId,
                 CodingPolicy.defaultPolicy(),
@@ -103,7 +103,7 @@ public class CifrToolAdapter extends BaseResource implements Tool {
                 workspaceRoot
         );
 
-        return delegate.execute(req, execCtx)
+        return delegate.execute(request, executionContext)
                 .map(res -> {
                     Map<String, Object> outputs = new LinkedHashMap<>();
                     boolean success = res != null && res.isSuccess();
@@ -146,6 +146,7 @@ public class CifrToolAdapter extends BaseResource implements Tool {
                 })
                 .subscribeAsCompletionStage();
     }
+
     private static String stableWorkspaceId(Path root) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
@@ -155,5 +156,4 @@ public class CifrToolAdapter extends BaseResource implements Tool {
             throw new IllegalStateException("SHA-256 is unavailable", e);
         }
     }
-
 }
