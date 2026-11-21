@@ -42,6 +42,7 @@ public class DirectoryListTool implements CifrTool {
     public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
         return Uni.createFrom().item(() -> {
             try {
+                Path workspaceRoot = context.resolveWorkspacePath(".");
                 String pathStr = (String) request.arguments().getOrDefault("path", ".");
                 Path dir = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                 String pattern = (String) request.arguments().getOrDefault("pattern", "*");
@@ -53,6 +54,7 @@ public class DirectoryListTool implements CifrTool {
                 }
                 boolean showHidden = Boolean.TRUE.equals(request.arguments().get("showHidden"));
 
+                Path dir = context.resolveWorkspacePath(pathStr);
                 if (!Files.isDirectory(dir))
                     return new DirectoryListResult(pathStr, List.of(), false);
 

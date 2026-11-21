@@ -15,7 +15,6 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class SearchTool implements CifrTool {
-
     private static final int DEFAULT_LIMIT = 50;
 
     @Override
@@ -76,6 +75,7 @@ public class SearchTool implements CifrTool {
                     .toList();
 
                 for (Path file : files) {
+                    context.resolveWorkspacePath(context.resolveWorkspacePath(".").relativize(file).toString());
                     if (matches.size() >= limit) {
                         truncated = true;
                         break;

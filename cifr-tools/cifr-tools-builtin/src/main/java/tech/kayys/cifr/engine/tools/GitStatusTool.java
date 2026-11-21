@@ -1,77 +1,45 @@
 package tech.kayys.cifr.engine.tools;
 
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.andalus.extension.Id;
-import tech.kayys.andalus.extension.Metadata;
-import tech.kayys.andalus.identity.ResourceId;
-import tech.kayys.andalus.resource.BaseResource;
-import tech.kayys.andalus.resource.ResourceType;
-import tech.kayys.andalus.tool.ToolContext;
-import tech.kayys.andalus.tool.ToolInvocation;
-import tech.kayys.andalus.tool.ToolResult;
+import tech.kayys.cifr.engine.tool.*;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.Set;
 
 @ApplicationScoped
-public class GitStatusTool extends AbstractGitTool {
-
-    private final Path workspace = Paths.get(System.getProperty("user.dir"));
-
-    public GitStatusTool() {
-        super(new ResourceId.ToolId(Id.random()), Metadata.builder().name("git.status").description("Runs git status --porcelain").build());
-    }
-
-    @Override protected String getToolName() { return "git.status"; }
-    @Override protected String getToolDescription() { return "Runs git status --porcelain"; }
-    @Override protected Map<String, Object> getToolInputSchema() { return Map.of(); }
+public class GitStatusTool implements CifrTool {
 
     @Override
-    public CompletableFuture<ToolResult> execute(ToolInvocation invocation, ToolContext context) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                ProcessBuilder builder = new ProcessBuilder("git", "status", "--porcelain");
-                builder.directory(workspace.toFile());
-                Process process = builder.start();
-                String output = new String(process.getInputStream().readAllBytes());
-                String error = new String(process.getErrorStream().readAllBytes());
-                int exitCode = process.waitFor();
+    public ToolDescriptor descriptor() {
+        return new ToolDescriptor("git.status", "Runs git status --porcelain in the active workspace",
+                ToolCategory.GIT, Map.of("type", "object"),
+                Set.of(ToolCapability.READ_ONLY), ToolRisk.NONE);
+    }
 
-                if (exitCode != 0) {
-                    final String msg = !error.isBlank() ? error.trim() : "Git exited with code " + exitCode;
-                    class ErrorToolResult extends BaseResource implements ToolResult {
-                        public ErrorToolResult(Id id) {
-                            super(new ResourceId.CustomId(id, new ResourceType.Custom("error")), Metadata.empty());
-                        }
-                        @Override public Map<String, Object> getOutputs() { return Map.of("error", msg); }
-                        @Override public boolean isSuccess() { return false; }
-                        @Override public String getErrorMessage() { return msg; }
-                    }
-                    return new ErrorToolResult(Id.random());
-                }
-                
-                class StatusToolResult extends BaseResource implements ToolResult {
-                    public StatusToolResult(Id id) {
-                        super(new ResourceId.CustomId(id, new ResourceType.Custom("result")), Metadata.empty());
-                    }
-                    @Override public Map<String, Object> getOutputs() { return Map.of("output", output); }
-                    @Override public boolean isSuccess() { return true; }
-                    @Override public String getErrorMessage() { return null; }
-                }
-                return new StatusToolResult(Id.random());
+    @Override
+    public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
+        return Uni.createFrom().item(() -> {
+            try {
+                Path root = context.resolveWorkspacePath(".");
+                ProcessBuilder builder = new ProcessBuilder("git", "status", "--porcelain");
+                builder.directory(root.toFile());
+                builder.redirectErrorStream(true);
+                Process process = builder.start();
+                String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                int exit = process.waitFor();
+                return new GitCommandResult(exit == 0, exit == 0 ? output : "git status failed: " + output);
             } catch (Exception e) {
-                class ErrorToolResult extends BaseResource implements ToolResult {
-                    public ErrorToolResult(Id id) {
-                        super(new ResourceId.CustomId(id, new ResourceType.Custom("error")), Metadata.empty());
-                    }
-                    @Override public Map<String, Object> getOutputs() { return Map.of("error", e.getMessage()); }
-                    @Override public boolean isSuccess() { return false; }
-                    @Override public String getErrorMessage() { return e.getMessage(); }
-                }
-                return new ErrorToolResult(Id.random());
+                return new GitCommandResult(false, "git status failed: " + e.getMessage());
             }
         });
+    }
+
+    private record GitCommandResult(boolean success, String summary) implements ToolResult {
+        @Override public boolean isSuccess() { return success; }
+        @Override public String getSummary() { return summary; }
     }
 }

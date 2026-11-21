@@ -1,17 +1,12 @@
 package tech.kayys.cifr.engine.tool;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.LinkOption;
 import java.util.Optional;
 import tech.kayys.cifr.engine.loop.CodingPolicy;
 
-/**
- * Execution context threaded through every tool invocation.
- * <p>
- * {@code workspaceRoot} is the resolved filesystem path for the active workspace.
- * Workspace identity is carried with each invocation so asynchronous tool execution
- * never depends on thread-local state.
- * </p>
- */
+/** Immutable, invocation-scoped identity and filesystem boundary for a CIFR tool call. */
 public record ToolExecutionContext(
     String taskId,
     String workspaceId,
@@ -20,39 +15,63 @@ public record ToolExecutionContext(
     Runnable cancellation,
     Optional<Path> workspaceRoot
 ) {
-    public ToolExecutionContext(String taskId, String workspaceId, CodingPolicy policy,
-            Optional<String> checkpoint, Runnable cancellation) {
-        this(taskId, workspaceId, policy, checkpoint, cancellation, Optional.empty());
-    }
-
     public ToolExecutionContext {
-        checkpoint = checkpoint != null ? checkpoint : Optional.empty();
-        cancellation = cancellation != null ? cancellation : () -> {};
-        workspaceRoot = workspaceRoot != null ? workspaceRoot : Optional.empty();
+        checkpoint = checkpoint == null ? Optional.empty() : checkpoint;
+        workspaceRoot = workspaceRoot == null ? Optional.empty()
+                : workspaceRoot.map(p -> p.toAbsolutePath().normalize());
+        cancellation = cancellation == null ? () -> {} : cancellation;
     }
 
-    /** Convenience factory without workspaceRoot. */
-    public static ToolExecutionContext of(
-            String taskId,
-            String workspaceId,
-            CodingPolicy policy,
-            Optional<String> checkpoint,
-            Runnable cancellation) {
-        return new ToolExecutionContext(
-                taskId, workspaceId, policy, checkpoint, cancellation, Optional.empty());
+    /** Compatibility factory. Workspace-scoped tools fail closed if no root is supplied. */
+    public static ToolExecutionContext of(String taskId, String workspaceId, CodingPolicy policy,
+            Optional<String> checkpoint, Runnable cancellation) {
+        return new ToolExecutionContext(taskId, workspaceId, policy, checkpoint, cancellation, Optional.empty());
     }
 
-    /** Convenience factory with explicit workspaceRoot. */
-    public static ToolExecutionContext of(
-            String taskId,
-            String workspaceId,
-            CodingPolicy policy,
-            Optional<String> checkpoint,
-            Runnable cancellation,
-            Path workspaceRoot) {
-        return new ToolExecutionContext(
-                taskId, workspaceId, policy, checkpoint, cancellation,
+    public static ToolExecutionContext of(String taskId, String workspaceId, CodingPolicy policy,
+            Optional<String> checkpoint, Runnable cancellation, Path workspaceRoot) {
+        return new ToolExecutionContext(taskId, workspaceId, policy, checkpoint, cancellation,
                 Optional.ofNullable(workspaceRoot));
     }
-}
 
+    public Path requireWorkspaceRoot() {
+        return workspaceRoot.orElseThrow(() ->
+                new IllegalStateException("Workspace root is required for this tool invocation"));
+    }
+
+    /**
+     * Resolve a user-supplied relative path inside this invocation's workspace.
+     * Existing symlinks (including symlinked parents for new files) are checked
+     * against the real workspace root to prevent escaping through symlinks.
+     */
+    public Path resolveWorkspacePath(String suppliedPath) {
+        if (suppliedPath == null || suppliedPath.isBlank()) {
+            throw new IllegalArgumentException("Workspace path cannot be empty");
+        }
+        try {
+        Path root = requireWorkspaceRoot().toRealPath();
+        Path supplied = Path.of(suppliedPath);
+        if (supplied.isAbsolute()) {
+            throw new SecurityException("Absolute paths are not allowed: " + suppliedPath);
+        }
+        Path candidate = root.resolve(supplied).normalize();
+        if (!candidate.startsWith(root)) {
+            throw new SecurityException("Path escapes workspace: " + suppliedPath);
+        }
+
+        Path existing = candidate;
+        while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) {
+            existing = existing.getParent();
+        }
+        if (existing == null || !existing.toRealPath().startsWith(root)) {
+            throw new SecurityException("Path resolves outside workspace: " + suppliedPath);
+        }
+        if (Files.exists(candidate, LinkOption.NOFOLLOW_LINKS) && !candidate.toRealPath().startsWith(root)) {
+            throw new SecurityException("Path resolves outside workspace: " + suppliedPath);
+        }
+        return candidate;
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Unable to resolve path within workspace", e);
+        }
+    }
+}

@@ -13,8 +13,6 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class WorkspaceInfoTool implements CifrTool {
-
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -40,14 +38,10 @@ public class WorkspaceInfoTool implements CifrTool {
                 String pathStr = (String) request.arguments().get("path");
                 int depth = ((Number) request.arguments().getOrDefault("depth", 2)).intValue();
 
-                Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot(context);
+                Path workspaceRoot = context.resolveWorkspacePath(".");
                 Path targetPath = pathStr != null
-                    ? WorkspaceResolver.resolveWorkspacePath(context, pathStr)
+                    ? context.resolveWorkspacePath(pathStr)
                     : workspaceRoot;
-
-                if (false) {
-                    return new WorkspaceInfoResult(false, "Access denied: path outside workspace", null);
-                }
 
                 if (!Files.exists(targetPath)) {
                     return new WorkspaceInfoResult(false, "Path does not exist: " + pathStr, null);

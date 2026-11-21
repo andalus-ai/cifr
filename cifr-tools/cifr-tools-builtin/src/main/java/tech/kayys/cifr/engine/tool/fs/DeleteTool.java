@@ -11,8 +11,6 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class DeleteTool implements CifrTool {
-
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(

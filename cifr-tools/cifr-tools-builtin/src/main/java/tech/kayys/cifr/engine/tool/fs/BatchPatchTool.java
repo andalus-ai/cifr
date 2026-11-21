@@ -17,8 +17,6 @@ import java.util.regex.Pattern;
  */
 @ApplicationScoped
 public class BatchPatchTool implements CifrTool {
-
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(

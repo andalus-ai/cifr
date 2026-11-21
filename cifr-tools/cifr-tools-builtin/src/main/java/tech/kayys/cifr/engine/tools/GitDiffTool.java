@@ -1,64 +1,51 @@
 package tech.kayys.cifr.engine.tools;
 
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import tech.kayys.andalus.extension.Id;
-import tech.kayys.andalus.extension.Metadata;
-import tech.kayys.andalus.identity.ResourceId;
-import tech.kayys.andalus.resource.BaseResource;
-import tech.kayys.andalus.resource.ResourceType;
-import tech.kayys.andalus.tool.ToolContext;
-import tech.kayys.andalus.tool.ToolInvocation;
-import tech.kayys.andalus.tool.ToolResult;
+import tech.kayys.cifr.engine.tool.*;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.Set;
 
 @ApplicationScoped
-public class GitDiffTool extends AbstractGitTool {
-
-    private final Path workspace = Paths.get(System.getProperty("user.dir"));
-
-    public GitDiffTool() {
-        super(new ResourceId.ToolId(Id.random()), Metadata.builder().name("git.diff").description("Runs git diff for a specific path").build());
-    }
-
-    @Override protected String getToolName() { return "git.diff"; }
-    @Override protected String getToolDescription() { return "Runs git diff for a specific path"; }
-    @Override protected Map<String, Object> getToolInputSchema() { return Map.of("path", "string"); }
+public class GitDiffTool implements CifrTool {
 
     @Override
-    public CompletableFuture<ToolResult> execute(ToolInvocation invocation, ToolContext context) {
-        return CompletableFuture.supplyAsync(() -> {
+    public ToolDescriptor descriptor() {
+        return new ToolDescriptor("git.diff", "Runs git diff for a workspace-relative path",
+                ToolCategory.GIT,
+                Map.of("type", "object", "properties", Map.of(
+                        "path", Map.of("type", "string", "description", "Workspace-relative path")
+                )),
+                Set.of(ToolCapability.READ_ONLY), ToolRisk.NONE);
+    }
+
+    @Override
+    public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
+        return Uni.createFrom().item(() -> {
             try {
-                String path = (String) invocation.arguments().getOrDefault("path", ".");
-                ProcessBuilder builder = new ProcessBuilder("git", "diff", path);
-                builder.directory(workspace.toFile());
+                Path root = context.resolveWorkspacePath(".");
+                String supplied = (String) request.arguments().getOrDefault("path", ".");
+                Path target = context.resolveWorkspacePath(supplied);
+                String relative = root.relativize(target).toString();
+                ProcessBuilder builder = new ProcessBuilder("git", "diff", "--", relative.isEmpty() ? "." : relative);
+                builder.directory(root.toFile());
+                builder.redirectErrorStream(true);
                 Process process = builder.start();
-                String output = new String(process.getInputStream().readAllBytes());
-                process.waitFor();
-                
-                class DiffToolResult extends BaseResource implements ToolResult {
-                    public DiffToolResult(Id id) {
-                        super(new ResourceId.CustomId(id, new ResourceType.Custom("result")), Metadata.empty());
-                    }
-                    @Override public Map<String, Object> getOutputs() { return Map.of("output", output); }
-                    @Override public boolean isSuccess() { return true; }
-                    @Override public String getErrorMessage() { return null; }
-                }
-                return new DiffToolResult(Id.random());
+                String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                int exit = process.waitFor();
+                return new GitCommandResult(exit == 0, exit == 0 ? output : "git diff failed: " + output);
             } catch (Exception e) {
-                class ErrorToolResult extends BaseResource implements ToolResult {
-                    public ErrorToolResult(Id id) {
-                        super(new ResourceId.CustomId(id, new ResourceType.Custom("error")), Metadata.empty());
-                    }
-                    @Override public Map<String, Object> getOutputs() { return Map.of(); }
-                    @Override public boolean isSuccess() { return false; }
-                    @Override public String getErrorMessage() { return e.getMessage(); }
-                }
-                return new ErrorToolResult(Id.random());
+                return new GitCommandResult(false, "git diff failed: " + e.getMessage());
             }
         });
+    }
+
+    private record GitCommandResult(boolean success, String summary) implements ToolResult {
+        @Override public boolean isSuccess() { return success; }
+        @Override public String getSummary() { return summary; }
     }
 }

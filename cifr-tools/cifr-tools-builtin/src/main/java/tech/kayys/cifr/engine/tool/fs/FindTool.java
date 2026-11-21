@@ -13,7 +13,6 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class FindTool implements CifrTool {
-
     private static final int DEFAULT_LIMIT = 100;
 
     @Override
@@ -76,6 +75,7 @@ public class FindTool implements CifrTool {
                         .toList();
 
                     for (Path p : paths) {
+                        context.resolveWorkspacePath(context.resolveWorkspacePath(".").relativize(p).toString());
                         if (entries.size() >= limit) { truncated = true; break; }
                         BasicFileAttributes attrs = Files.readAttributes(p, BasicFileAttributes.class);
                         long size = attrs.isDirectory() ? 0 : attrs.size();

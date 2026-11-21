@@ -12,8 +12,6 @@ import java.util.Set;
 
 @ApplicationScoped
 public class CopyTool implements CifrTool {
-
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(

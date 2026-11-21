@@ -12,7 +12,6 @@ import java.util.Set;
 
 @ApplicationScoped
 public class WriteFileTool implements CifrTool {
-
     private static final int MAX_WRITE_SIZE = 50 * 1024 * 1024; // 50MB
 
     @Override

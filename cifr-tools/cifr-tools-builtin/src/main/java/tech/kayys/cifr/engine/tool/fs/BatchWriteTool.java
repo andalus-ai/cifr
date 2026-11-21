@@ -10,7 +10,6 @@ import java.util.*;
 
 @ApplicationScoped
 public class BatchWriteTool implements CifrTool {
-
     private static final int MAX_FILES_PER_BATCH = 100;
 
     @Override
