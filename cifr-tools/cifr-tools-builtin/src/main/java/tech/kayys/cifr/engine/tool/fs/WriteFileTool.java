@@ -48,7 +48,7 @@ public class WriteFileTool implements CifrTool {
                     return new WriteFileResult(false, "Path cannot be empty", null);
                 }
 
-                Path absolutePath = context.resolveWorkspacePath(pathStr);
+                Path absolutePath = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                 if (content.length() > MAX_WRITE_SIZE) {
                     return new WriteFileResult(false, "Content exceeds 50MB limit", null);
                 }

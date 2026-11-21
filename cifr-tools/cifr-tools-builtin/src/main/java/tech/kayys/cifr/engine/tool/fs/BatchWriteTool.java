@@ -50,7 +50,7 @@ public class BatchWriteTool implements CifrTool {
             try {
                 // Validate and backup
                 for (Map<String, Object> spec : fileSpecs) {
-                    Path abs = context.resolveWorkspacePath((String) spec.get("path"));
+                    Path abs = WorkspaceResolver.resolveWorkspacePath(context, (String) spec.get("path"));
                     if (atomic && Files.exists(abs)) backups.put(abs, Files.readString(abs));
                 }
 
@@ -59,7 +59,7 @@ public class BatchWriteTool implements CifrTool {
                     String pathStr = (String) spec.get("path");
                     String content = (String) spec.getOrDefault("content", "");
                     boolean append = Boolean.TRUE.equals(spec.get("append"));
-                    Path abs = context.resolveWorkspacePath(pathStr);
+                    Path abs = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                     if (abs.getParent() != null) Files.createDirectories(abs.getParent());
                     if (append && Files.exists(abs)) {
                         Files.writeString(abs, content, StandardOpenOption.APPEND);

@@ -44,8 +44,8 @@ public class CopyTool implements CifrTool {
 
                 if (srcStr == null || dstStr == null) return new CopyResult(false, "Source and destination required");
 
-                Path src = context.resolveWorkspacePath(srcStr);
-                Path dst = context.resolveWorkspacePath(dstStr);
+                Path src = WorkspaceResolver.resolveWorkspacePath(context, srcStr);
+                Path dst = WorkspaceResolver.resolveWorkspacePath(context, dstStr);
 
                 if (!Files.exists(src))
                     return new CopyResult(false, "Source does not exist: " + srcStr);

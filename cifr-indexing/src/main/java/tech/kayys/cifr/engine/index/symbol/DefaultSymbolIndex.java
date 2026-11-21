@@ -69,14 +69,24 @@ public class DefaultSymbolIndex implements SymbolIndex {
 
     @Override
     public Uni<SymbolInfo> getSymbol(SymbolId id) {
+        return findSymbol(id, null);
+    }
+
+    @Override
+    public Uni<SymbolInfo> getSymbol(SymbolId id, String workspaceId) {
+        return findSymbol(id, workspaceId == null || workspaceId.isBlank() ? null : workspaceId);
+    }
+
+    private Uni<SymbolInfo> findSymbol(SymbolId id, String workspaceId) {
         if (id == null) return Uni.createFrom().nullItem();
-        SymbolInfo info = symbolsById.values().stream()
-                .filter(s -> s.id() != null && s.id().equals(id))
-                .findFirst().orElseGet(() -> symbolsById.values().stream()
-                        .filter(s -> s.name().equalsIgnoreCase(id.qualifiedName())
-                                || (s.id() != null && s.id().qualifiedName().equalsIgnoreCase(id.qualifiedName())))
-                        .findFirst().orElse(null));
-        return Uni.createFrom().item(info);
+        List<SymbolInfo> matches = symbolsById.values().stream()
+                .filter(s -> workspaceId == null || workspaceId.equals(s.workspaceId()))
+                .filter(s -> s.id() != null && (s.id().equals(id)
+                        || s.name().equalsIgnoreCase(id.qualifiedName())
+                        || s.id().qualifiedName().equalsIgnoreCase(id.qualifiedName())))
+                .toList();
+        // Never choose an arbitrary project's symbol for an unscoped ambiguous name.
+        return Uni.createFrom().item(matches.size() == 1 ? matches.get(0) : null);
     }
 
     @Override
@@ -100,10 +110,10 @@ public class DefaultSymbolIndex implements SymbolIndex {
         String key = info.workspaceId() + "|" + (info.file() == null ? "" : info.file()) + "|" + qualified;
         SymbolInfo previous = symbolsById.put(key, info);
         if (info.file() != null) {
-            CopyOnWriteArrayList<SymbolInfo> fileSymbols =
+            CopyOnWriteArrayList<SymbolInfo> values =
                     symbolsByFile.computeIfAbsent(fileKey(info.workspaceId(), info.file()), ignored -> new CopyOnWriteArrayList<>());
-            if (previous != null) fileSymbols.remove(previous);
-            fileSymbols.addIfAbsent(info);
+            if (previous != null) values.remove(previous);
+            values.addIfAbsent(info);
         }
     }
 
