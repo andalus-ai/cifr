@@ -6,16 +6,19 @@ import jakarta.inject.Inject;
 import tech.kayys.cifr.engine.context.ContextEngine;
 import tech.kayys.cifr.engine.context.ContextPlan;
 import tech.kayys.cifr.engine.index.FileIndex;
-import tech.kayys.cifr.engine.index.WorkspaceFingerprint;
-import tech.kayys.cifr.engine.index.indexer.WorkspaceIndexer;
 import tech.kayys.cifr.engine.patch.mutation.MutationEngine;
 import tech.kayys.cifr.engine.verification.VerificationEngine;
+import tech.kayys.cifr.engine.index.indexer.WorkspaceIndexer;
 
 import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Default implementation of {@link ClosedLoopCoder}.
+ * Default closed-loop repair entry point.
+ *
+ * <p>This implementation currently has no model/planner input capable of
+ * producing an {@code EditProposal}. It must therefore fail explicitly rather
+ * than claim a repair was applied and verified.</p>
  */
 @ApplicationScoped
 public class DefaultClosedLoopCoder implements ClosedLoopCoder {
@@ -58,8 +61,10 @@ public class DefaultClosedLoopCoder implements ClosedLoopCoder {
         Path workspaceRoot,
         String projectId
     ) {
-        return contextEngine.assemble(plan, workspaceRoot, projectId)
-            .flatMap(packet -> fileIndex.computeFingerprint(workspaceRoot))
-            .map(fp -> RepairResult.success(1, List.of(), fp));
+        return Uni.createFrom().item(RepairResult.failed(
+                0,
+                List.of(),
+                "Repair was not executed: no edit proposal or repair strategy is available. " +
+                "Refusing to report success without mutation and verification."));
     }
 }
