@@ -52,7 +52,7 @@ public class ClosedLoopVerificationTest {
         contextEngine = new DefaultContextEngine(symbolIndex, fileIndex, dependencyIndex, relationIndex, new DefaultContextBudgeter());
         workspaceIndexer = new DefaultWorkspaceIndexer(fileIndex, symbolIndex, dependencyIndex, relationIndex);
 
-        closedLoopCoder = new DefaultClosedLoopCoder(contextEngine, mutationEngine, verificationEngine, workspaceIndexer, fileIndex);
+        closedLoopCoder = new DefaultClosedLoopCoder();
     }
 
     @AfterEach
