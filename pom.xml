@@ -4,25 +4,21 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>tech.kayys.andalus</groupId>
-        <artifactId>andalus-parent</artifactId>
-        <version>0.0.1</version>
-        <relativePath>../../../../../Families/Andalus/Community/andalus/pom.xml</relativePath>
-    </parent>
-
+    <!-- Cifr owns its build lifecycle. Andalus integrations are ordinary
+         dependencies/adapters and must not be required to build this project. -->
     <groupId>tech.kayys</groupId>
     <artifactId>cifr-parent</artifactId>
     <version>0.1.0</version>
     <packaging>pom</packaging>
 
     <name>Cifr - Parent</name>
-    <description>Cifr Autonomous Coding Agent Subsystem</description>
+    <description>Cifr Autonomous Coding Agent Platform</description>
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+        <jandex.maven.plugin.version>3.2.7</jandex.maven.plugin.version>
         <quarkus.platform.version>3.32.2</quarkus.platform.version>
         <andalus.version>0.0.1</andalus.version>
     </properties>
@@ -39,9 +35,68 @@
         </dependencies>
     </dependencyManagement>
 
+    <repositories>
+        <repository>
+            <id>central</id>
+            <name>Maven Central</name>
+            <url>https://repo.maven.apache.org/maven2</url>
+        </repository>
+        <repository>
+            <id>jboss-public-repository-group</id>
+            <name>JBoss Public Repository Group</name>
+            <url>https://repository.jboss.org/nexus/content/groups/public/</url>
+        </repository>
+        <repository>
+            <id>sonatype-snapshots</id>
+            <name>Sonatype OSS Snapshots</name>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>central</id>
+            <name>Maven Central</name>
+            <url>https://repo.maven.apache.org/maven2</url>
+        </pluginRepository>
+        <pluginRepository>
+            <id>jboss-public-repository-group</id>
+            <name>JBoss Public Repository Group</name>
+            <url>https://repository.jboss.org/nexus/content/groups/public/</url>
+        </pluginRepository>
+    </pluginRepositories>
+
+    <profiles>
+        <profile>
+            <id>ci</id>
+            <properties>
+                <quarkus.datasource.devservices.enabled>false</quarkus.datasource.devservices.enabled>
+            </properties>
+        </profile>
+    </profiles>
+
     <build>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven.compiler.plugin.version}</version>
+                    <configuration>
+                        <release>${maven.compiler.release}</release>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>io.smallrye</groupId>
+                    <artifactId>jandex-maven-plugin</artifactId>
+                    <version>${jandex.maven.plugin.version}</version>
+                </plugin>
                 <plugin>
                     <groupId>io.quarkus.platform</groupId>
                     <artifactId>quarkus-maven-plugin</artifactId>
@@ -63,5 +118,4 @@
         <module>cifr-engine</module>
         <module>cifr-api</module>
     </modules>
-
 </project>
