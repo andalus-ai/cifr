@@ -10,6 +10,9 @@ public sealed interface AgentEvent {
 
     record TaskFailed() implements AgentEvent {}
 
+    /** Indicates that the configured repair budget is exhausted. */
+    record TaskExhausted() implements AgentEvent {}
+
     record VerificationCompleted() implements AgentEvent {}
 
     record ReviewCompleted() implements AgentEvent {}
@@ -26,8 +29,8 @@ public sealed interface AgentEvent {
 
     // Telemetry / Observable events
     record PhaseStarted(String executionId, AgentPhase phase, java.time.Instant startedAt) implements AgentEvent {}
-    
+
     record PhaseCompleted(String executionId, AgentPhase phase, java.time.Instant completedAt) implements AgentEvent {}
-    
+
     record PhaseFailed(String executionId, AgentPhase phase, java.time.Instant failedAt, String reason) implements AgentEvent {}
 }
