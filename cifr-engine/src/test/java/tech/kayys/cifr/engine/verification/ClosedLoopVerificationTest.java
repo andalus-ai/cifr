@@ -140,8 +140,9 @@ public class ClosedLoopVerificationTest {
 
         RepairResult result = closedLoopCoder.executeLoop(plan, 3, tempWorkspace, "proj-1").await().indefinitely();
 
-        assertTrue(result.success());
-        assertEquals(1, result.totalAttempts());
-        assertNotNull(result.finalFingerprint());
+        assertFalse(result.success(), "A repair without a generated proposal must not report success");
+        assertEquals(0, result.totalAttempts());
+        assertTrue(result.message().contains("no edit proposal"));
+        assertEquals("// original content\npublic class Main {}\n", Files.readString(target));
     }
 }
