@@ -1,0 +1,36 @@
+name: Cifr CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cifr-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  maven:
+    name: Maven validation (JDK 25)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Validate complete reactor model
+        run: mvn --batch-mode --no-transfer-progress -Pci validate
+
+      - name: Verify standalone IDE client module
+        run: mvn --batch-mode --no-transfer-progress -Pci -pl cifr-ide-client -am verify
