@@ -2,45 +2,48 @@ package tech.kayys.cifr.engine.verification.graph;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @ApplicationScoped
 public class DefaultCompletionPolicy implements CompletionPolicy {
 
     @Override
     public CompletionDecision evaluate(VerificationGraph graph, List<Requirement> requirements) {
+        // Missing policy input is not proof of completion. In particular, an empty
+        // requirement set must not turn an unverified task into a successful one.
         if (graph == null || requirements == null || requirements.isEmpty()) {
-            return CompletionDecision.COMPLETE;
+            return CompletionDecision.NEED_MORE_VERIFICATION;
         }
 
-        int verifiedCount = 0;
-        int failedCount = 0;
+        Set<String> requirementIds = new HashSet<>();
+        for (Requirement requirement : requirements) {
+            if (requirement == null || requirement.id() == null || requirement.id().isBlank()
+                    || !requirementIds.add(requirement.id())) {
+                return CompletionDecision.BLOCKED;
+            }
+        }
 
-        for (Requirement req : requirements) {
-            if (graph.isRequirementVerified(req.id())) {
-                verifiedCount++;
-            } else {
-                // Check if there is explicit contradiction
-                String reqNodeId = "req:" + req.id();
-                boolean hasContradiction = graph.allEdges().stream().anyMatch(e ->
-                    (e.to().nodeId().equals(reqNodeId) || e.from().nodeId().equals(reqNodeId)) &&
-                    e.type() == EdgeType.CONTRADICTS
-                );
+        boolean allVerified = true;
+        for (Requirement requirement : requirements) {
+            if (requirement.status() == RequirementStatus.FAILED) {
+                return CompletionDecision.NEED_REPAIR;
+            }
+
+            if (!graph.isRequirementVerified(requirement.id())) {
+                allVerified = false;
+                String requirementNodeId = "req:" + requirement.id();
+                boolean hasContradiction = graph.allEdges().stream().anyMatch(edge ->
+                        (edge.to().nodeId().equals(requirementNodeId)
+                                || edge.from().nodeId().equals(requirementNodeId))
+                                && edge.type() == EdgeType.CONTRADICTS);
                 if (hasContradiction) {
-                    failedCount++;
+                    return CompletionDecision.NEED_REPAIR;
                 }
             }
         }
 
-        if (failedCount > 0) {
-            return CompletionDecision.NEED_REPAIR;
-        }
-
-        if (verifiedCount == requirements.size()) {
-            return CompletionDecision.COMPLETE;
-        }
-
-        // If some requirements are not yet verified
-        return CompletionDecision.NEED_MORE_VERIFICATION;
+        return allVerified ? CompletionDecision.COMPLETE : CompletionDecision.NEED_MORE_VERIFICATION;
     }
 }
