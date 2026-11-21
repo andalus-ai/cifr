@@ -52,7 +52,8 @@ public class SearchTool implements CifrTool {
             String subPath = (String) request.arguments().getOrDefault("path", ".");
             int limit = ((Number) request.arguments().getOrDefault("limit", DEFAULT_LIMIT)).intValue();
 
-            Path searchRoot = context.resolveWorkspacePath(subPath);
+            Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot(context);
+            Path searchRoot = WorkspaceResolver.resolveWorkspacePath(context, subPath);
             if (!Files.exists(searchRoot)) {
                 return new SearchResult(query, List.of(), false);
             }
@@ -85,7 +86,7 @@ public class SearchTool implements CifrTool {
                             String line = lines.get(i);
                             if (pattern.matcher(line).find()) {
                                 matches.add(new SearchMatch(
-                                    context.requireWorkspaceRoot().relativize(file).toString(),
+                                    workspaceRoot.relativize(file).toString(),
                                     i + 1,
                                     line.trim()
                                 ));

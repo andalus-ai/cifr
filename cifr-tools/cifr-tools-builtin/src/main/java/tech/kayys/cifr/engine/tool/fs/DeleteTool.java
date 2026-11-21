@@ -47,7 +47,9 @@ public class DeleteTool implements CifrTool {
             List<String> errors = new ArrayList<>();
 
             for (String pathStr : pathStrs) {
-                Path abs = context.resolveWorkspacePath(pathStr);
+                Path abs;
+                try { abs = WorkspaceResolver.resolveWorkspacePath(context, pathStr); }
+                catch (IllegalArgumentException e) { errors.add("Denied: " + pathStr); continue; }
                 if (!Files.exists(abs)) {
                     if (!force) errors.add("Not found: " + pathStr);
                     continue;

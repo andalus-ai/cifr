@@ -56,7 +56,7 @@ public class BatchPatchTool implements CifrTool {
                 for (Map<String, Object> spec : patchSpecs) {
                     String pathStr = (String) spec.get("path");
                     if (pathStr == null) throw new IllegalArgumentException("Missing path in patch spec");
-                    Path abs = context.resolveWorkspacePath(pathStr);
+                    Path abs = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                     if (!Files.exists(abs)) throw new NoSuchFileException("File not found: " + pathStr);
                     if (!backups.containsKey(abs)) backups.put(abs, Files.readString(abs));
                 }
@@ -69,7 +69,7 @@ public class BatchPatchTool implements CifrTool {
                     boolean isRegex = Boolean.TRUE.equals(spec.get("isRegex"));
                     boolean all = !Boolean.FALSE.equals(spec.getOrDefault("all", true));
 
-                    Path abs = context.resolveWorkspacePath(pathStr);
+                    Path abs = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                     String content = Files.readString(abs);
                     String newContent;
                     int matchCount;

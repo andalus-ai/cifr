@@ -55,7 +55,7 @@ public class FindTool implements CifrTool {
                 String modifiedAfterStr = (String) request.arguments().get("modifiedAfter");
                 Instant modifiedAfter = modifiedAfterStr != null ? Instant.parse(modifiedAfterStr) : Instant.EPOCH;
 
-                Path searchRoot = context.resolveWorkspacePath(pathStr);
+                Path searchRoot = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                 if (!Files.exists(searchRoot))
                     return new FindResult(pattern, List.of(), false);
 
