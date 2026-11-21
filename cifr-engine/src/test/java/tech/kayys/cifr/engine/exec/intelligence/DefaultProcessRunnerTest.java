@@ -6,7 +6,7 @@ import tech.kayys.cifr.engine.orchestrator.policy.ExecutionBudget;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
+import java.util.Map;\nimport java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,7 +50,7 @@ class DefaultProcessRunnerTest {
         assertFalse(result.isSuccess());
     }
 
-    private static ProcessSpec spec(List<String> command, ExecutionBudget budget) {
+    @Test\n    void cancellationUsesCallerKnownExecutionId() throws Exception {\n        String executionId = UUID.randomUUID().toString();\n        ProcessSpec request = new ProcessSpec(List.of("sh", "-c", "sleep 5"),\n                Path.of(".").toAbsolutePath(), Map.of(),\n                new ExecutionBudget(Duration.ofSeconds(10), 1024, 1024, 1), executionId);\n        var completion = runner.execute(request).subscribeAsCompletionStage();\n        Thread.sleep(150);\n        runner.cancel(executionId).await().indefinitely();\n        ProcessResult result = completion.toCompletableFuture().get(3, java.util.concurrent.TimeUnit.SECONDS);\n        assertEquals(ProcessStatus.CANCELLED, result.status());\n        assertEquals(executionId, result.processId());\n    }\n\n    private static ProcessSpec spec(List<String> command, ExecutionBudget budget) {
         return new ProcessSpec(command, Path.of(".").toAbsolutePath(), Map.of(), budget);
     }
 }
