@@ -30,7 +30,6 @@ public class DefaultAgentStateMachine implements AgentStateMachine {
     }
 
     private AgentPhase determineNextPhase(AgentPhase current, AgentEvent event) {
-        // Handle global cancel
         if (event instanceof AgentEvent.CancellationRequested) {
             return AgentPhase.CANCELLED;
         }
@@ -45,7 +44,7 @@ public class DefaultAgentStateMachine implements AgentStateMachine {
                 yield null;
             }
             case PLANNING -> {
-                if (event instanceof AgentEvent.TaskSucceeded) yield AgentPhase.EXECUTING; // or similar
+                if (event instanceof AgentEvent.TaskSucceeded) yield AgentPhase.EXECUTING;
                 yield null;
             }
             case EXECUTING -> {
@@ -56,6 +55,7 @@ public class DefaultAgentStateMachine implements AgentStateMachine {
             case VERIFYING -> {
                 if (event instanceof AgentEvent.ReviewCompleted) yield AgentPhase.REVIEWING;
                 if (event instanceof AgentEvent.TaskFailed) yield AgentPhase.REPLANNING;
+                if (event instanceof AgentEvent.TaskExhausted) yield AgentPhase.FAILED;
                 yield null;
             }
             case REVIEWING -> {
@@ -72,7 +72,7 @@ public class DefaultAgentStateMachine implements AgentStateMachine {
                 yield null;
             }
             case REPLANNING -> {
-                if (event instanceof AgentEvent.TaskSucceeded) yield AgentPhase.EXECUTING;
+                if (event instanceof AgentEvent.PlanCreated || event instanceof AgentEvent.TaskSucceeded) yield AgentPhase.EXECUTING;
                 yield null;
             }
             default -> null;
