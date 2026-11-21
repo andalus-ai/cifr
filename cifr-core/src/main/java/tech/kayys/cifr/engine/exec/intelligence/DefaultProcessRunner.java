@@ -53,7 +53,7 @@ public class DefaultProcessRunner implements ProcessRunner {
             builder.environment().putAll(spec.environment());
 
             process = builder.start();
-            processId = Long.toString(process.pid());
+            processId = spec.executionId();
             final Process startedProcess = process;
             running = new RunningProcess(startedProcess);
             activeProcesses.put(processId, running);
