@@ -121,7 +121,7 @@ public class ClosedLoopVerificationTest {
     }
 
     @Test
-    void testClosedLoopExecutionSuccess() throws IOException {
+    void testClosedLoopDoesNotReportSuccessWithoutAProposal() throws IOException {
         Path src = tempWorkspace.resolve("src");
         Files.createDirectories(src);
 
