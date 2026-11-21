@@ -155,13 +155,28 @@ public class CifrToolProvider implements ToolProvider {
                     List.of()
             );
 
+            String workspaceId = null;
+            java.nio.file.Path workspaceRoot = null;
+            Runnable cancellation = () -> {};
+            if (ctx instanceof HarnessToolExecutionContext harnessContext) {
+                if (harnessContext.workspaceId() != null && !harnessContext.workspaceId().isBlank()) {
+                    workspaceId = harnessContext.workspaceId();
+                }
+                workspaceRoot = harnessContext.workspaceRoot().orElse(null);
+                cancellation = () -> {
+                    if (harnessContext.cancellation() != null) {
+                        harnessContext.cancellation().cancel();
+                    }
+                };
+            }
             tech.kayys.cifr.engine.tool.ToolExecutionContext cifrCtx =
                     tech.kayys.cifr.engine.tool.ToolExecutionContext.of(
                             taskId,
-                            "harness",
+                            workspaceId,
                             null,
                             Optional.empty(),
-                            () -> {}
+                            cancellation,
+                            workspaceRoot
                     );
 
             // Execute (block on Uni — harness ToolExecutor is synchronous at this layer)

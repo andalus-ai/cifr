@@ -1,48 +1,66 @@
 package tech.kayys.cifr.engine.tool;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 
+/**
+ * Compatibility facade for workspace resolution. Resolution is deliberately
+ * invocation-scoped; ambient ThreadLocal, environment and user.dir fallbacks
+ * are unsafe in concurrent asynchronous agent executions.
+ */
 public final class WorkspaceResolver {
-
     private WorkspaceResolver() {}
 
-    /** Set by CifrToolAdapter before executing each tool call, cleared after. */
-    private static final ThreadLocal<String> SESSION_WORKSPACE = new ThreadLocal<>();
-
-    /** Set the workspace root for the current thread (call before tool execution). */
-    public static void setSessionWorkspace(String path) {
-        if (path != null && !path.isBlank()) {
-            SESSION_WORKSPACE.set(path);
+    public static Path resolveWorkspaceRoot(ToolExecutionContext context) {
+        if (context == null || context.workspaceRoot() == null || context.workspaceRoot().isEmpty()) {
+            throw new IllegalStateException("Tool invocation has no explicit workspace root");
+        }
+        Path root = context.workspaceRoot().get().toAbsolutePath().normalize();
+        if (!Files.isDirectory(root)) {
+            throw new IllegalArgumentException("Workspace root is not an existing directory: " + root);
+        }
+        try {
+            return root.toRealPath();
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot resolve workspace root: " + root, e);
         }
     }
 
-    /** Clear the thread-local workspace override (call after tool execution). */
-    public static void clearSessionWorkspace() {
-        SESSION_WORKSPACE.remove();
-    }
-
-    public static Path resolveWorkspaceRoot() {
-        // 1. Thread-local set by the current session (highest priority)
-        String session = SESSION_WORKSPACE.get();
-        if (session != null && !session.isBlank()) {
-            Path p = Path.of(session).toAbsolutePath().normalize();
-            if (Files.exists(p)) return p;
+    /**
+     * Resolves a model-supplied relative path without permitting traversal or symlink escape.
+     * Existing targets are checked by their real path; for new targets, the nearest existing
+     * ancestor is checked so a symlinked parent cannot escape the workspace.
+     */
+    public static Path resolveWorkspacePath(ToolExecutionContext context, String relativePath) {
+        Path root = resolveWorkspaceRoot(context);
+        if (relativePath == null || relativePath.isBlank()) {
+            throw new IllegalArgumentException("Workspace-relative path is required");
         }
-        // 2. Environment variable
-        String env = System.getenv("WORKSPACE_ROOT");
-        if (env != null && !env.isBlank()) {
-            Path p = Path.of(env).toAbsolutePath().normalize();
-            if (Files.exists(p)) return p;
+        Path supplied = Path.of(relativePath);
+        if (supplied.isAbsolute()) {
+            throw new IllegalArgumentException("Absolute paths are not allowed: " + relativePath);
         }
-        // 3. System property
-        String prop = System.getProperty("workspace.root");
-        if (prop != null && !prop.isBlank()) {
-            Path p = Path.of(prop).toAbsolutePath().normalize();
-            if (Files.exists(p)) return p;
+        Path candidate = root.resolve(supplied).normalize();
+        if (!candidate.startsWith(root)) {
+            throw new IllegalArgumentException("Path escapes workspace: " + relativePath);
         }
-        // 4. Walk up from user.dir — generic fallback (no hardcoded project name)
-        Path curr = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
-        return curr;
+        try {
+            Path existing = candidate;
+            while (existing != null && !Files.exists(existing)) {
+                existing = existing.getParent();
+            }
+            if (existing == null || !existing.toRealPath().startsWith(root)) {
+                throw new IllegalArgumentException("Path escapes workspace through a symlink: " + relativePath);
+            }
+            if (Files.exists(candidate) && !candidate.toRealPath().startsWith(root)) {
+                throw new IllegalArgumentException("Path escapes workspace through a symlink: " + relativePath);
+            }
+            return candidate;
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot safely resolve workspace path: " + relativePath, e);
+        }
+        if (context == null) {
+            throw new IllegalStateException("Tool execution context is required");
+        }
+        return context.requireWorkspaceRoot();
     }
 }

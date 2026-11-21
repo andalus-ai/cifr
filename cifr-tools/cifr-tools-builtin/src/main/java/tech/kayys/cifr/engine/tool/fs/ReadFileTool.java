@@ -7,7 +7,6 @@ import tech.kayys.cifr.engine.tool.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -15,9 +14,6 @@ import java.util.Set;
 
 @ApplicationScoped
 public class ReadFileTool implements CifrTool {
-
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -47,8 +43,8 @@ public class ReadFileTool implements CifrTool {
                     return new ReadFileResult("", 0, 0, List.of(), new FileMetadata(0L, 0L, true));
                 }
 
-                Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot();
-                Path absPath = workspaceRoot.resolve(pathStr).normalize();
+                Path workspaceRoot = WorkspaceResolver.resolveWorkspaceRoot(context);
+                Path absPath = WorkspaceResolver.resolveWorkspacePath(context, pathStr);
                 if (!Files.exists(absPath) || Files.isDirectory(absPath)) {
                     return new ReadFileResult(pathStr, 0, 0, List.of(), new FileMetadata(0L, 0L, true));
                 }

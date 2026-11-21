@@ -9,6 +9,7 @@ import tech.kayys.cifr.engine.index.symbol.SymbolIndex;
 import tech.kayys.cifr.engine.index.symbol.SymbolInfo;
 
 import java.util.List;
+import java.util.Objects;
 
 @ApplicationScoped
 public class DefaultReferenceIndex implements ReferenceIndex {
@@ -18,25 +19,27 @@ public class DefaultReferenceIndex implements ReferenceIndex {
 
     @Override
     public Uni<List<Reference>> getReferences(ReferenceRequest request) {
-        if (request == null || request.targetSymbol() == null || fileIndex == null || symbolIndex == null) {
+        if (request == null || request.targetSymbol() == null) {
+            return Uni.createFrom().failure(new IllegalArgumentException("targetSymbol is required"));
+        }
+        if (request.limit() <= 0) return Uni.createFrom().item(List.of());
+
+        return symbolIndex.getSymbol(request.targetSymbol(), request.workspaceId())
+                .onItem().transformToUni(symbol -> resolveForSymbol(request, symbol));
+    }
+
+    private Uni<List<Reference>> resolveForSymbol(ReferenceRequest request, SymbolInfo symbol) {
+        if (symbol == null || symbol.file() == null || symbol.workspaceId() == null || symbol.workspaceId().isBlank()) {
             return Uni.createFrom().item(List.of());
         }
-        String workspaceId = request.workspaceId();
-        return fileIndex.getCurrentIndex(workspaceId)
-                .onItem().transformToUni(records -> findDefinition(records, 0, request.targetSymbol(), workspaceId))
-                .onItem().transformToUni(definition -> {
-                    if (definition == null || referenceResolver == null
-                            || !referenceResolver.supports(definition.record())) {
-                        return Uni.createFrom().item(List.of());
-                    }
-                    return referenceResolver.resolveReferences(definition.record(), request.targetSymbol())
-                            .onItem().transform(references -> {
-                                if (references == null || request.limit() <= 0 || references.size() <= request.limit()) {
-                                    return references == null ? List.of() : references;
-                                }
-                                return references.subList(0, request.limit());
-                            });
-                });
+        return fileIndex.getCurrentIndex(symbol.workspaceId()).onItem().transformToUni(records -> {
+            FileRecord record = records.stream()
+                    .filter(candidate -> Objects.equals(candidate.workspaceId(), symbol.workspaceId()))
+                    .filter(candidate -> candidate.path() != null && candidate.path().normalize().equals(symbol.file().normalize()))
+                    .findFirst().orElse(null);
+            if (record == null || !referenceResolver.supports(record)) return Uni.createFrom().item(List.of());
+            return referenceResolver.resolveReferences(record, request.targetSymbol(), request.limit());
+        });
     }
 
     /**

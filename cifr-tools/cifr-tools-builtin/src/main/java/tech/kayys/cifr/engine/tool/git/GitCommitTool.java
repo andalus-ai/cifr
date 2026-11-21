@@ -14,8 +14,6 @@ import java.util.Set;
 @ApplicationScoped
 public class GitCommitTool implements CifrTool {
 
-    private static final Path WORKSPACE_ROOT = Paths.get(System.getProperty("user.dir"));
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
@@ -41,6 +39,7 @@ public class GitCommitTool implements CifrTool {
     public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
         return Uni.createFrom().item(() -> {
             try {
+                Path workspace = context.resolveWorkspacePath(".");
                 String message = (String) request.arguments().get("message");
                 boolean all = Boolean.TRUE.equals(request.arguments().getOrDefault("all", false));
                 boolean amend = Boolean.TRUE.equals(request.arguments().getOrDefault("amend", false));
@@ -57,7 +56,7 @@ public class GitCommitTool implements CifrTool {
                 cmd.add(message);
 
                 ProcessBuilder pb = new ProcessBuilder(cmd);
-                pb.directory(WORKSPACE_ROOT.toFile());
+                pb.directory(workspace.toFile());
                 pb.redirectErrorStream(true);
 
                 Process process = pb.start();
@@ -66,7 +65,7 @@ public class GitCommitTool implements CifrTool {
 
                 if (exitCode == 0) {
                     ProcessBuilder hashPb = new ProcessBuilder("git", "rev-parse", "HEAD");
-                    hashPb.directory(WORKSPACE_ROOT.toFile());
+                    hashPb.directory(workspace.toFile());
                     Process hashProcess = hashPb.start();
                     String hash = new String(hashProcess.getInputStream().readAllBytes()).trim();
                     hashProcess.waitFor();
