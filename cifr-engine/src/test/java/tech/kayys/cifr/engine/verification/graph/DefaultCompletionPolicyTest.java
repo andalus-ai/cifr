@@ -14,7 +14,7 @@ class DefaultCompletionPolicyTest {
     void missingGraphDoesNotImplyCompletion() {
         assertEquals(CompletionDecision.NEED_MORE_VERIFICATION,
                 policy.evaluate(null, List.of(Requirement.of(
-                        "compile", "Compile the project", RequirementType.STRUCTURAL, RequirementPriority.MANDATORY))));
+                        "compile", "Compile the project", RequirementType.STRUCTURAL, RequirementPriority.CRITICAL))));
     }
 
     @Test
@@ -26,7 +26,7 @@ class DefaultCompletionPolicyTest {
     @Test
     void unverifiedRequirementRequiresMoreVerification() {
         Requirement requirement = Requirement.of(
-                "tests", "Run relevant tests", RequirementType.BEHAVIORAL, RequirementPriority.MANDATORY);
+                "tests", "Run relevant tests", RequirementType.BEHAVIORAL, RequirementPriority.CRITICAL);
 
         assertEquals(CompletionDecision.NEED_MORE_VERIFICATION,
                 policy.evaluate(new VerificationGraph(), List.of(requirement)));
@@ -35,7 +35,7 @@ class DefaultCompletionPolicyTest {
     @Test
     void supportedRequirementCanComplete() {
         Requirement requirement = Requirement.of(
-                "compile", "Compile the project", RequirementType.STRUCTURAL, RequirementPriority.MANDATORY);
+                "compile", "Compile the project", RequirementType.STRUCTURAL, RequirementPriority.CRITICAL);
         VerificationGraph graph = new VerificationGraph();
         VerificationNode.RequirementNode requirementNode =
                 new VerificationNode.RequirementNode(requirement);
@@ -49,7 +49,7 @@ class DefaultCompletionPolicyTest {
     @Test
     void contradictoryRequirementNeedsRepair() {
         Requirement requirement = Requirement.of(
-                "tests", "Tests pass", RequirementType.BEHAVIORAL, RequirementPriority.MANDATORY);
+                "tests", "Tests pass", RequirementType.BEHAVIORAL, RequirementPriority.CRITICAL);
         VerificationGraph graph = new VerificationGraph();
         VerificationNode.RequirementNode requirementNode =
                 new VerificationNode.RequirementNode(requirement);
@@ -64,7 +64,7 @@ class DefaultCompletionPolicyTest {
     void failedRequirementNeedsRepair() {
         Requirement requirement = new Requirement(
                 "tests", "Tests pass", RequirementType.BEHAVIORAL,
-                RequirementPriority.MANDATORY, RequirementStatus.FAILED);
+                RequirementPriority.CRITICAL, RequirementStatus.FAILED);
 
         assertEquals(CompletionDecision.NEED_REPAIR,
                 policy.evaluate(new VerificationGraph(), List.of(requirement)));
@@ -73,9 +73,9 @@ class DefaultCompletionPolicyTest {
     @Test
     void duplicateRequirementIdsBlockEvaluation() {
         Requirement first = Requirement.of(
-                "tests", "Tests pass", RequirementType.BEHAVIORAL, RequirementPriority.MANDATORY);
+                "tests", "Tests pass", RequirementType.BEHAVIORAL, RequirementPriority.CRITICAL);
         Requirement duplicate = Requirement.of(
-                "tests", "Run tests", RequirementType.STRUCTURAL, RequirementPriority.MANDATORY);
+                "tests", "Run tests", RequirementType.STRUCTURAL, RequirementPriority.CRITICAL);
 
         assertEquals(CompletionDecision.BLOCKED,
                 policy.evaluate(new VerificationGraph(), List.of(first, duplicate)));
