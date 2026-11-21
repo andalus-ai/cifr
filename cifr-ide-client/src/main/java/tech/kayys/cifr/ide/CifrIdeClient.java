@@ -127,7 +127,8 @@ public final class CifrIdeClient implements AutoCloseable {
 
     public JsonNode invoke(String window, String command, Map<String, ?> arguments)
             throws IOException, InterruptedException, TimeoutException {
-        return invoke(window, command, mapper.valueToTree(arguments == null ? Map.of() : arguments));
+        JsonNode argumentNode = mapper.valueToTree(arguments == null ? Map.of() : arguments);
+        return invoke(window, command, argumentNode);
     }
 
     private JsonNode request(String method, Object params)
