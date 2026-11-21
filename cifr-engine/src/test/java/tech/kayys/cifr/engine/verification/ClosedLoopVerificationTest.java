@@ -47,7 +47,7 @@ public class ClosedLoopVerificationTest {
         fileIndex = new DefaultFileIndex();
         DefaultDependencyIndex dependencyIndex = new DefaultDependencyIndex();
 
-        verificationEngine = new DefaultVerificationEngine(relationIndex);
+        verificationEngine = new DefaultVerificationEngine();
         mutationEngine = new DefaultMutationEngine();
         contextEngine = new DefaultContextEngine(symbolIndex, fileIndex, dependencyIndex, relationIndex, new DefaultContextBudgeter());
         workspaceIndexer = new DefaultWorkspaceIndexer(fileIndex, symbolIndex, dependencyIndex, relationIndex);
@@ -69,7 +69,7 @@ public class ClosedLoopVerificationTest {
     }
 
     @Test
-    void testVerificationEngineLevel0Syntax() {
+    void testVerificationEngineDoesNotClaimSyntaxWithoutProvider() {
         EditProposal empty = new EditProposal("Empty", List.of(), List.of(), List.of());
         VerificationResult res = verificationEngine.verify(new WorkspaceFingerprint("fp", "1.0", "cfg"), empty, VerificationLevel.SYNTAX_L0, tempWorkspace).await().indefinitely();
 
@@ -80,11 +80,12 @@ public class ClosedLoopVerificationTest {
         EditProposal valid = new EditProposal("Valid", List.of(validEdit), List.of(), List.of());
         VerificationResult validRes = verificationEngine.verify(new WorkspaceFingerprint("fp", "1.0", "cfg"), valid, VerificationLevel.SYNTAX_L0, tempWorkspace).await().indefinitely();
 
-        assertTrue(validRes.success());
+        assertFalse(validRes.success(), "A non-empty patch is not proof of syntax validity");
+        assertEquals("NotConfigured", validRes.failures().get(0).errorType());
     }
 
     @Test
-    void testVerificationEngineLevel1StaticAnalysisQualityGate() throws IOException {
+    void testVerificationEngineDoesNotClaimLintWithoutProvider() throws IOException {
         Path src = tempWorkspace.resolve("src");
         Files.createDirectories(src);
 
@@ -99,11 +100,12 @@ public class ClosedLoopVerificationTest {
         assertFalse(res.success());
         assertEquals(VerificationLevel.LINT_L1, res.level());
         assertEquals(1, res.failures().size());
-        assertEquals("SecurityVulnerability", res.failures().get(0).errorType());
+        assertEquals("NotConfigured", res.failures().get(0).errorType());
+        assertTrue(res.outputLog().contains("Verification was not run"));
     }
 
     @Test
-    void testVerificationEngineTargetedTestFailures() throws IOException {
+    void testVerificationEngineDoesNotClaimTestsWithoutProvider() throws IOException {
         Path src = tempWorkspace.resolve("src");
         Files.createDirectories(src);
 
@@ -117,7 +119,8 @@ public class ClosedLoopVerificationTest {
 
         assertFalse(res.success());
         assertFalse(res.failures().isEmpty());
-        assertEquals("AssertionError", res.failures().get(0).errorType());
+        assertEquals("NotConfigured", res.failures().get(0).errorType());
+        assertTrue(res.outputLog().contains("Verification was not run"));
     }
 
     @Test
