@@ -2,51 +2,39 @@ package tech.kayys.cifr.engine.tool.script;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
 import tech.kayys.cifr.engine.tool.*;
-import tech.kayys.cifr.engine.tool.harness.CifrHarnessBridge;
-import tech.kayys.cifr.engine.tool.harness.HarnessToolExecutionContext;
 
-import java.nio.file.Path;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * High-risk Java script execution tool. Arbitrary scripts require an approved isolated execution environment.
- * Includes automatic self-bootstrapping/download if not installed on the host.
- *
- * <p>Execution is routed through {@link CifrHarnessBridge} for capability checking,
- * audit journaling, and output validation via the Andalus Harness {@code GovernedToolExecutor}.</p>
+ * High-risk Java script execution tool. It remains disabled until Cifr has
+ * per-invocation approval and an OS-isolated execution backend.
  */
 @ApplicationScoped
 public class JBangTool implements CifrTool {
-
-    private static final Logger LOG = Logger.getLogger(JBangTool.class);
-    private static final int DEFAULT_TIMEOUT_SECONDS = 180;
-
-    @Inject
-    CifrHarnessBridge harnessBridge;
 
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
                 "jbang",
-                "Execute Java scripts, applications, and instant snippets with zero configuration and automated Maven dependency fetching via JBang. Automatically downloads JBang if missing.",
+                "Execute Java scripts and snippets. Requires an approved isolated execution environment.",
                 ToolCategory.SHELL,
                 Map.of(
                         "type", "object",
                         "properties", Map.of(
                                 "code", Map.of("type", "string", "description", "Java code snippet or script to run instantly."),
                                 "script_path", Map.of("type", "string", "description", "Path to an existing .java/.jsh file or remote URL to run."),
-                                "dependencies", Map.of("type", "array", "description", "Maven coordinates for dependencies (e.g. ['org.apache.commons:commons-lang3:3.14.0']).",
+                                "dependencies", Map.of("type", "array", "description", "Maven coordinates for dependencies.",
                                         "items", Map.of("type", "string")),
                                 "args", Map.of("type", "array", "description", "Arguments passed to the Java application.",
                                         "items", Map.of("type", "string")),
                                 "jbang_args", Map.of("type", "array", "description", "Additional CLI flags passed to jbang.",
                                         "items", Map.of("type", "string")),
-                                "action", Map.of("type", "string", "description", "Action to perform: 'run' (default), 'install' (verify/download jbang), 'info'.",
+                                "action", Map.of("type", "string", "description", "Action to perform: run, install, or info.",
                                         "enum", List.of("run", "install", "info")),
-                                "timeout", Map.of("type", "integer", "description", "Execution timeout in seconds (default 180).")
+                                "timeout", Map.of("type", "integer", "description", "Execution timeout in seconds.")
                         )
                 ),
                 Set.of(ToolCapability.EXECUTE_PROCESS, ToolCapability.NETWORK_ACCESS),
@@ -59,28 +47,5 @@ public class JBangTool implements CifrTool {
         return Uni.createFrom().item(() -> JBangResult.err(
                 "JBang is disabled: arbitrary scripts require per-invocation approval and an OS-isolated execution backend",
                 "", "", -1));
-    }
-
-    private static String argString(Map<String, Object> args, String key, String defaultValue) {
-        Object v = args.get(key);
-        return v instanceof String s && !s.isBlank() ? s : defaultValue;
-    }
-
-    private static int argInt(Map<String, Object> args, String key, int defaultValue) {
-        Object v = args.get(key);
-        if (v instanceof Number n) return n.intValue();
-        if (v instanceof String s) {
-            try { return Integer.parseInt(s); } catch (NumberFormatException ignore) {}
-        }
-        return defaultValue;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<String> argStringList(Map<String, Object> args, String key) {
-        Object v = args.get(key);
-        if (v instanceof List<?> list) {
-            return list.stream().filter(Objects::nonNull).map(Object::toString).toList();
-        }
-        return Collections.emptyList();
     }
 }
