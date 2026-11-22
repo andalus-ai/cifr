@@ -30,8 +30,6 @@
             <artifactId>cifr-indexing</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- Andalus Harness — governed tool execution pipeline -->
-        <!-- Andalus Sandbox — LocalProcessSandbox for secure process execution -->
         <dependency>
             <groupId>io.smallrye.reactive</groupId>
             <artifactId>mutiny</artifactId>
