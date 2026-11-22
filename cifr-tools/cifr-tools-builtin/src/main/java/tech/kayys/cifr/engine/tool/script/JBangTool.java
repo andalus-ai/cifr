@@ -12,7 +12,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Cifr tool for executing Java scripts and instant snippets with automatic dependency resolution via JBang.
+ * High-risk Java script execution tool. Arbitrary scripts require an approved isolated execution environment.
  * Includes automatic self-bootstrapping/download if not installed on the host.
  *
  * <p>Execution is routed through {@link CifrHarnessBridge} for capability checking,
@@ -50,7 +50,7 @@ public class JBangTool implements CifrTool {
                         )
                 ),
                 Set.of(ToolCapability.EXECUTE_PROCESS, ToolCapability.NETWORK_ACCESS),
-                ToolRisk.MEDIUM
+                ToolRisk.CRITICAL
         );
     }
 
