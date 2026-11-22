@@ -159,8 +159,12 @@ public class DefaultProcessRunner implements ProcessRunner {
     private static ProcessResult result(
             int exitCode, Duration duration, ProcessStatus status,
             String stdout, String stderr, String message, String processId) {
-        return new ProcessResult(exitCode, duration, status, stdout,
-                message == null || message.isBlank() ? stderr : message, processId);
+        String diagnostic = message == null || message.isBlank()
+                ? stderr
+                : stderr == null || stderr.isBlank()
+                        ? message
+                        : stderr + "\n" + message;
+        return new ProcessResult(exitCode, duration, status, stdout, diagnostic, processId);
     }
 
     private static final class RunningProcess {
