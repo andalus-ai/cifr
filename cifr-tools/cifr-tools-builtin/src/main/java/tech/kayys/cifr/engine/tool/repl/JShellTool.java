@@ -14,10 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Cifr tool for interactive Java REPL and snippet evaluation via JShell.
- *
- * <p>Registered in {@link CifrHarnessBridge} at startup so that all JShell evaluations
- * pass through the Andalus Harness capability scope and action journal.</p>
+ * Interactive Java REPL. Evaluated snippets are arbitrary JVM code and must
+ * therefore be treated as high-risk code execution, not as a read-only tool.
  */
 @ApplicationScoped
 public class JShellTool implements CifrTool {
@@ -29,12 +27,11 @@ public class JShellTool implements CifrTool {
 
     private final Map<String, JShellImpl> sharedSessions = new ConcurrentHashMap<>();
 
-
     @Override
     public ToolDescriptor descriptor() {
         return new ToolDescriptor(
                 "jshell",
-                "Evaluate Java code interactively using JShell. Supports expressions, statements, methods, and classes.",
+                "Evaluate arbitrary Java code interactively using JShell. Requires an approved isolated execution environment.",
                 ToolCategory.SHELL,
                 Map.of(
                         "type", "object",
@@ -45,8 +42,8 @@ public class JShellTool implements CifrTool {
                         ),
                         "required", List.of("code")
                 ),
-                Set.of(ToolCapability.READ_ONLY),
-                ToolRisk.LOW
+                Set.of(ToolCapability.EXECUTE_PROCESS, ToolCapability.NETWORK_ACCESS),
+                ToolRisk.CRITICAL
         );
     }
 
