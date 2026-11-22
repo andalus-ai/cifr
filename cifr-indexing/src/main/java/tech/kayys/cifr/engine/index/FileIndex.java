@@ -25,8 +25,6 @@ public interface FileIndex {
         return scanWorkspace(workspaceRoot);
     }
 
-    Uni<List<FileRecord>> getCurrentIndex(String workspaceId);
-    void registerFile(FileRecord record);
     void clear();
 
     /** Removes only one workspace's file records. */

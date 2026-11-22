@@ -4,8 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Cifr owns its build lifecycle. Andalus integrations are ordinary
-         dependencies/adapters and must not be required to build this project. -->
+    <!-- Cifr owns its build lifecycle; optional integrations are activated by Maven profiles. -->
     <groupId>tech.kayys</groupId>
     <artifactId>cifr-parent</artifactId>
     <version>0.1.0</version>
@@ -78,6 +77,12 @@
             <properties>
                 <quarkus.datasource.devservices.enabled>false</quarkus.datasource.devservices.enabled>
             </properties>
+        </profile>
+        <profile>
+            <id>andalus-integration</id>
+            <modules>
+                <module>cifr-integrations/cifr-andalus-adapter</module>
+            </modules>
         </profile>
     </profiles>
 
