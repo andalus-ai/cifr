@@ -1,0 +1,55 @@
+name: Cifr IDE Rust CI
+
+on:
+  pull_request:
+    paths:
+      - 'cifr-ide/**'
+      - '.github/workflows/rust-ide.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'cifr-ide/**'
+      - '.github/workflows/rust-ide.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cifr-rust-ide-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: cifr-ide
+
+jobs:
+  rust:
+    name: Rust workspace (stable)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cifr-ide -> target
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check workspace and all targets
+        run: cargo check --workspace --all-targets
+
+      - name: Run workspace tests
+        run: cargo test --workspace --all-targets
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
