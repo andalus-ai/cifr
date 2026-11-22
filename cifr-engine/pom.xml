@@ -33,11 +33,6 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys</groupId>
-            <artifactId>cifr-standalone</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys</groupId>
             <artifactId>cifr-tools-api</artifactId>
             <version>${project.version}</version>
         </dependency>
