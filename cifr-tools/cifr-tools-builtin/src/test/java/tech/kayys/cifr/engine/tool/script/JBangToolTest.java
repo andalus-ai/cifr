@@ -50,9 +50,8 @@ public class JBangToolTest {
         );
         ToolResult result = tool.execute(req, null).await().indefinitely();
         assertNotNull(result);
-        if (result.isSuccess()) {
-            assertTrue(result instanceof JBangResult);
-        }
+        assertFalse(result.isSuccess());
+        assertTrue(result.getSummary().contains("OS-isolated execution backend"));
     }
 
     @Test
@@ -71,10 +70,8 @@ public class JBangToolTest {
         );
         ToolResult result = tool.execute(req, null).await().indefinitely();
 
-        assertTrue(result.isSuccess(), "Execution failed: " + result.getSummary());
-        assertTrue(result instanceof JBangResult);
-        JBangResult jr = (JBangResult) result;
-        assertTrue(jr.output().contains("CIFR_INSTANT:42"));
+        assertFalse(result.isSuccess());
+        assertTrue(result.getSummary().contains("OS-isolated execution backend"));
     }
 
     @Test
