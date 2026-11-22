@@ -79,6 +79,12 @@
                 <quarkus.datasource.devservices.enabled>false</quarkus.datasource.devservices.enabled>
             </properties>
         </profile>
+        <profile>
+            <id>andalus-integration</id>
+            <modules>
+                <module>cifr-integrations/cifr-andalus-adapter</module>
+            </modules>
+        </profile>
     </profiles>
 
     <build>
