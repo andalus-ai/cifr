@@ -62,7 +62,7 @@ class ToolchainVerificationPlannerTest {
     @Test
     void plansNodeBuildAndTestsExplicitly() throws Exception {
         Path root = workspace("node");
-        Files.writeString(root.resolve("package.json"), "{\"name\":\"sample\"}");
+        Files.writeString(root.resolve("package.json"), "{\\"name\\":\\"sample\\",\\"scripts\\":{\\"build\\":\\"tsc\\",\\"test\\":\\"vitest run\\"}}");
 
         VerificationPlan plan = planner.plan(root);
 
