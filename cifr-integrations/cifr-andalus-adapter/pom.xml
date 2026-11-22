@@ -22,27 +22,7 @@
         </dependency>
         <dependency>
             <groupId>tech.kayys.andalus</groupId>
-            <artifactId>andalus-tool</artifactId>
-            <version>${andalus.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.andalus</groupId>
-            <artifactId>andalus-runtime-spi</artifactId>
-            <version>${andalus.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.andalus</groupId>
-            <artifactId>andalus-core</artifactId>
-            <version>${andalus.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.andalus</groupId>
             <artifactId>andalus-harness</artifactId>
-            <version>${andalus.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.andalus</groupId>
-            <artifactId>andalus-sandbox</artifactId>
             <version>${andalus.version}</version>
         </dependency>
         <dependency>
