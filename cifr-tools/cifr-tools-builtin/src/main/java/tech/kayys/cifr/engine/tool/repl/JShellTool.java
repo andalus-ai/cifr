@@ -49,6 +49,10 @@ public class JShellTool implements CifrTool {
 
     @Override
     public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
+        return Uni.createFrom().item(() -> JShellResult.err(
+                "JShell is disabled: arbitrary JVM code requires a per-invocation approval and an OS-isolated execution backend",
+                null));
+        /*
         return Uni.createFrom().item(() -> {
             Map<String, Object> args = request.arguments();
             String code = (String) args.get("code");
@@ -78,6 +82,7 @@ public class JShellTool implements CifrTool {
                 return JShellResult.err("JShell error: " + ex.getMessage(), null);
             }
         });
+        */
     }
 
     private JShellImpl.Result evaluateInFreshSession(String code, int timeoutMs) {
