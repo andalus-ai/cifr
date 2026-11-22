@@ -2,12 +2,15 @@ package tech.kayys.cifr.engine.verification;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import tech.kayys.cifr.engine.orchestrator.toolchain.BuildSystem;
 import tech.kayys.cifr.engine.orchestrator.toolchain.ProjectDetector;
 import tech.kayys.cifr.engine.orchestrator.toolchain.ProjectToolchain;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -19,6 +22,8 @@ import java.util.List;
  */
 @ApplicationScoped
 public class ToolchainVerificationPlanner {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final ProjectDetector projectDetector;
 
@@ -41,7 +46,7 @@ public class ToolchainVerificationPlanner {
         List<VerificationCheckDefinition> checks = switch (buildSystem) {
             case MAVEN -> mavenChecks(root);
             case GRADLE -> gradleChecks(root);
-            case NPM -> nodeChecks();
+            case NPM -> nodeChecks(root);
             case CARGO -> cargoChecks();
             case GO_MODULE, GO -> goChecks();
             case PYPROJECT, PYTHON -> pythonChecks();
@@ -70,10 +75,30 @@ public class ToolchainVerificationPlanner {
                 check("tests", "gradle", launcher, "test"));
     }
 
-    private static List<VerificationCheckDefinition> nodeChecks() {
-        return List.of(
-                check("compile", "npm", "npm", "run", "build"),
-                check("tests", "npm", "npm", "test"));
+    private static List<VerificationCheckDefinition> nodeChecks(Path root) {
+        Path packageJson = root.resolve("package.json");
+        try {
+            JsonNode document = JSON.readTree(packageJson.toFile());
+            JsonNode scripts = document == null ? null : document.path("scripts");
+            if (scripts == null || !scripts.isObject()) {
+                return List.of();
+            }
+            java.util.ArrayList<VerificationCheckDefinition> checks = new java.util.ArrayList<>();
+            if (isConfiguredScript(scripts, "build")) {
+                checks.add(check("compile", "npm", "npm", "run", "build"));
+            }
+            if (isConfiguredScript(scripts, "test")) {
+                checks.add(check("tests", "npm", "npm", "test"));
+            }
+            return List.copyOf(checks);
+        } catch (IOException | RuntimeException invalidPackageManifest) {
+            return List.of();
+        }
+    }
+
+    private static boolean isConfiguredScript(JsonNode scripts, String name) {
+        JsonNode script = scripts.get(name);
+        return script != null && script.isTextual() && !script.asText().isBlank();
     }
 
     private static List<VerificationCheckDefinition> cargoChecks() {

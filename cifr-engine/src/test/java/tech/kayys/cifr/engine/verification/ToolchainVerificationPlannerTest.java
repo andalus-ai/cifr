@@ -62,13 +62,50 @@ class ToolchainVerificationPlannerTest {
     @Test
     void plansNodeBuildAndTestsExplicitly() throws Exception {
         Path root = workspace("node");
-        Files.writeString(root.resolve("package.json"), "{\"name\":\"sample\"}");
+        Files.writeString(root.resolve("package.json"), "{\\"name\\":\\"sample\\",\\"scripts\\":{\\"build\\":\\"tsc\\",\\"test\\":\\"vitest run\\"}}");
 
         VerificationPlan plan = planner.plan(root);
 
         assertEquals(BuildSystem.NPM, plan.buildSystem());
         assertEquals(List.of("npm", "run", "build"), plan.checks().get(0).command());
         assertEquals(List.of("npm", "test"), plan.checks().get(1).command());
+    }
+
+    @Test
+    void doesNotInventNodeChecksWhenScriptsAreMissing() throws Exception {
+        Path root = workspace("node-no-scripts");
+        Files.writeString(root.resolve("package.json"), "{\"name\":\"sample\"}");
+
+        VerificationPlan plan = planner.plan(root);
+
+        assertEquals(BuildSystem.NPM, plan.buildSystem());
+        assertFalse(plan.supported());
+        assertTrue(plan.requiredCheckIds().isEmpty());
+        assertTrue(plan.unsupportedReason().contains("NPM"));
+    }
+
+    @Test
+    void plansOnlyNodeScriptsThatActuallyExist() throws Exception {
+        Path root = workspace("node-test-only");
+        Files.writeString(root.resolve("package.json"),
+                "{\"name\":\"sample\",\"scripts\":{\"test\":\"vitest run\"}}");
+
+        VerificationPlan plan = planner.plan(root);
+
+        assertTrue(plan.supported());
+        assertEquals(List.of("tests"), plan.requiredCheckIds());
+        assertEquals(List.of("npm", "test"), plan.checks().get(0).command());
+    }
+
+    @Test
+    void malformedNodeManifestProducesUnsupportedPlan() throws Exception {
+        Path root = workspace("node-invalid");
+        Files.writeString(root.resolve("package.json"), "{ not-json");
+
+        VerificationPlan plan = planner.plan(root);
+
+        assertFalse(plan.supported());
+        assertTrue(plan.requiredCheckIds().isEmpty());
     }
 
     @Test
