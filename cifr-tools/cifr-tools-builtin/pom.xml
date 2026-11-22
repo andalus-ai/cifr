@@ -30,33 +30,8 @@
             <artifactId>cifr-indexing</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>tech.kayys.andalus</groupId>
-            <artifactId>andalus-tool</artifactId>
-            <version>0.0.1</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.andalus</groupId>
-            <artifactId>andalus-runtime-spi</artifactId>
-            <version>0.0.1</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.kayys.andalus</groupId>
-            <artifactId>andalus-core</artifactId>
-            <version>0.0.1</version>
-        </dependency>
         <!-- Andalus Harness — governed tool execution pipeline -->
-        <dependency>
-            <groupId>tech.kayys.andalus</groupId>
-            <artifactId>andalus-harness</artifactId>
-            <version>0.0.1</version>
-        </dependency>
         <!-- Andalus Sandbox — LocalProcessSandbox for secure process execution -->
-        <dependency>
-            <groupId>tech.kayys.andalus</groupId>
-            <artifactId>andalus-sandbox</artifactId>
-            <version>0.0.1</version>
-        </dependency>
         <dependency>
             <groupId>io.smallrye.reactive</groupId>
             <artifactId>mutiny</artifactId>
