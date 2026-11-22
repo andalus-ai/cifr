@@ -98,6 +98,11 @@ public class CifrHarnessBridgeTest {
     }
 
     @Test
+    void testHighRiskCodeExecutionIsNotEligibleForAutomaticRegistration() {
+        assertTrue(CifrHarnessBridge.requiresExplicitApproval(jshellTool));
+    }
+
+    @Test
     void testAllowlistParsingIsExactAndIgnoresEmptyEntries() {
         assertEquals(Set.of("jshell", "read_file"),
                 CifrHarnessBridge.parseAllowedTools(" jshell, ,read_file "));
@@ -112,9 +117,12 @@ public class CifrHarnessBridgeTest {
     }
 
     @Test
-    void testGovernedExecutionWithBudgetAndJournal() {
+    void testJshellIsDeniedUntilApprovalAndIsolationAreAvailable() {
         HarnessToolExecutionContext ctx = new HarnessToolExecutionContext("test-task-1", () -> {});
-        
+
+        assertTrue(CifrHarnessBridge.requiresExplicitApproval(jshellTool),
+                "Arbitrary JVM code must not be classified as a low-risk read-only tool");
+
         ToolResult result = bridge.executeGoverned(
                 "jshell",
                 Map.of("code", "1 + 1"),
@@ -122,15 +130,8 @@ public class CifrHarnessBridgeTest {
         );
 
         assertNotNull(result);
-        assertTrue(result.isSuccess(), "Execution should succeed");
-        assertTrue(result.output().preview().contains("2"));
-
-        // Verify that ActionJournal tracked the tool execution
-        var history = bridge.journal().history(ctx.executionId());
-        assertFalse(history.isEmpty(), "Journal should record the action");
-        assertEquals("tool:jshell", history.get(0).type());
-
-        // Verify that BudgetManager tracked the tool call
+        assertFalse(result.isSuccess(),
+                "JShell must not be executable through a bridge without per-call approval and OS isolation");
         assertNotNull(bridge.budgetManager());
     }
 }

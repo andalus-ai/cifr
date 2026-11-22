@@ -6,6 +6,8 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import tech.kayys.cifr.engine.tool.CifrTool;
+import tech.kayys.cifr.engine.tool.ToolCapability;
+import tech.kayys.cifr.engine.tool.ToolRisk;
 import tech.kayys.andalus.harness.capability.DefaultCapabilityScope;
 import tech.kayys.andalus.harness.execution.action.InMemoryActionJournal;
 import tech.kayys.andalus.harness.governance.budget.BudgetManager;
@@ -30,23 +32,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * CDI singleton that wires all {@link CifrTool} implementations into the Andalus Harness
- * {@link GovernedToolExecutor} pipeline.
+ * CDI singleton wiring Cifr tools into the Andalus governed execution pipeline.
  *
- * <p>At startup this bridge:
- * <ol>
- *   <li>Discovers every {@code @ApplicationScoped} {@link CifrTool} via CDI.</li>
- *   <li>Wraps each one as an {@link CifrToolProvider} and registers it in a {@link ToolCatalog}.</li>
- *   <li>Builds a {@link GovernedToolExecutor} with:
- *       explicit tool allowlist (deny by default), input/output validation,
- *       budget tracking via {@link BudgetManager}, and an in-memory {@link InMemoryActionJournal} for auditability.</li>
- * </ol>
- *
- * <p>Tools that are registered here can be executed through the governed pipeline via
- * {@link #executeGoverned(String, Map, HarnessToolExecutionContext)}.
- * The JShell and JBang tools call this method to gain capability checking, budget governance, audit logging,
- * and output validation without changing their own {@link CifrTool} implementation.
- * </p>
+ * <p>Arbitrary code execution and network-capable tools are deliberately not
+ * registered here. The current bridge has no per-invocation approval provider
+ * and no OS-isolated execution backend; an operator allowlist alone is not
+ * sufficient authorization to execute untrusted code.</p>
  */
 @ApplicationScoped
 public class CifrHarnessBridge {
@@ -64,22 +55,22 @@ public class CifrHarnessBridge {
     void init() {
         ToolCatalog catalog = new DefaultToolCatalog();
 
-        // Register all discovered Cifr tools in the catalog
         int count = 0;
         for (CifrTool tool : cifrTools) {
+            if (requiresExplicitApproval(tool)) {
+                LOG.warnf("Not registering high-risk Cifr tool until an approval and isolation provider exists: %s",
+                        tool.descriptor().name());
+                continue;
+            }
             CifrToolProvider provider = new CifrToolProvider(tool);
             catalog.register(provider);
             LOG.infof("Registered Cifr tool in harness catalog: %s", tool.descriptor().name());
             count++;
         }
-        LOG.infof("CifrHarnessBridge initialized with %d tools", count);
+        LOG.infof("CifrHarnessBridge initialized with %d eligible tools", count);
 
-        // Build resolver (capability-name and tool-id matching)
         ToolResolver resolver = new DefaultToolResolver(catalog);
 
-        // The harness executor evaluates the tool name as the capability ID. Keep this
-        // boundary explicit and fail closed: no tool is executable until an operator
-        // opts it in through configuration.
         String configuredTools = System.getProperty("cifr.harness.allowed-tools");
         if (configuredTools == null || configuredTools.isBlank()) {
             configuredTools = System.getenv("CIFR_HARNESS_ALLOWED_TOOLS");
@@ -92,7 +83,6 @@ public class CifrHarnessBridge {
             LOG.infof("CIFR harness explicitly enabled tools: %s", allowedTools);
         }
 
-        // Budget manager: track and govern tool calls
         DefaultBudgetLedger ledger = new DefaultBudgetLedger();
         DefaultBudgetPolicy budgetPolicy = new DefaultBudgetPolicy(ledger);
         this.budgetManager = new DefaultBudgetManager(ledger, budgetPolicy);
@@ -101,16 +91,34 @@ public class CifrHarnessBridge {
                 catalog,
                 resolver,
                 capScope,
-                null,                            // no additional policy chain configured
-                budgetManager,                   // budget manager tracking tool calls
-                null,                            // no approval gate; scope denies unconfigured tools
-                journal,                         // in-memory audit journal
-                null,                            // no memory store
-                ToolInputValidator.standard(),   // standard schema validator
-                ToolOutputValidator.standard(),  // standard output validator
-                ToolResultRouter.standard(),     // standard result router
-                null                             // default scheduler
+                null,
+                budgetManager,
+                null,
+                journal,
+                null,
+                ToolInputValidator.standard(),
+                ToolOutputValidator.standard(),
+                ToolResultRouter.standard(),
+                null
         );
+    }
+
+    /**
+     * The bridge currently has no trusted per-call approval contract or isolated
+     * process backend. Deny tools capable of executing arbitrary code, reaching
+     * the network, or carrying a high/critical risk classification.
+     */
+    static boolean requiresExplicitApproval(CifrTool tool) {
+        if (tool == null || tool.descriptor() == null) {
+            return true;
+        }
+        var descriptor = tool.descriptor();
+        Set<ToolCapability> capabilities = descriptor.capabilities();
+        return descriptor.risk() == null
+                || descriptor.risk() == ToolRisk.HIGH
+                || descriptor.risk() == ToolRisk.CRITICAL
+                || (capabilities != null && (capabilities.contains(ToolCapability.EXECUTE_PROCESS)
+                || capabilities.contains(ToolCapability.NETWORK_ACCESS)));
     }
 
     static Set<String> parseAllowedTools(String configured) {
@@ -123,19 +131,10 @@ public class CifrHarnessBridge {
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
-    /**
-     * Executes a tool through the full 10-step {@link GovernedToolExecutor} pipeline.
-     *
-     * @param toolName   the tool name (e.g., {@code "jshell"}, {@code "jbang"})
-     * @param arguments  the tool arguments map
-     * @param ctx        the harness execution context (identity, cancellation, resources)
-     * @return the governed {@link ToolResult}
-     */
     public ToolResult executeGoverned(
             String toolName,
             Map<String, Object> arguments,
             HarnessToolExecutionContext ctx) {
-
         ToolArguments toolArgs = ToolArguments.of(arguments);
         ToolIntent intent = new ToolIntent(
                 ToolIntentId.generate(),
@@ -146,23 +145,14 @@ public class CifrHarnessBridge {
         return governedExecutor.execute(intent, ctx, null);
     }
 
-    /**
-     * Returns the action journal for observability and testing.
-     */
     public InMemoryActionJournal journal() {
         return journal;
     }
 
-    /**
-     * Returns the budget manager for tool invocation budget tracking and limiting.
-     */
     public BudgetManager budgetManager() {
         return budgetManager;
     }
 
-    /**
-     * Checks whether the bridge has been initialized and is ready to execute tools.
-     */
     public boolean isReady() {
         return governedExecutor != null;
     }

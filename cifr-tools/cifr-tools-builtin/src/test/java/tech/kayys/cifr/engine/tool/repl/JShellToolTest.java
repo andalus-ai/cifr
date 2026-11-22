@@ -50,10 +50,8 @@ public class JShellToolTest {
         );
 
         ToolResult result = tool.execute(request, null).await().indefinitely();
-        assertTrue(result.isSuccess());
-        assertTrue(result instanceof JShellResult);
-        JShellResult jr = (JShellResult) result;
-        assertTrue(jr.output().contains("42"));
+        assertFalse(result.isSuccess());
+        assertTrue(result.getSummary().contains("OS-isolated execution backend"));
     }
 
     @Test
@@ -66,7 +64,7 @@ public class JShellToolTest {
                 List.of()
         );
         ToolResult res1 = tool.execute(req1, null).await().indefinitely();
-        assertTrue(res1.isSuccess());
+        assertFalse(res1.isSuccess());
 
         ToolRequest req2 = new ToolRequest(
                 "jshell",
@@ -75,9 +73,7 @@ public class JShellToolTest {
                 List.of()
         );
         ToolResult res2 = tool.execute(req2, null).await().indefinitely();
-        assertTrue(res2.isSuccess());
-        JShellResult jr = (JShellResult) res2;
-        assertEquals("\"CIFR\"", jr.output());
+        assertFalse(res2.isSuccess());
     }
 
     @Test

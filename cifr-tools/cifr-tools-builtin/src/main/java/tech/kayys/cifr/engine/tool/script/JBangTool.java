@@ -12,7 +12,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Cifr tool for executing Java scripts and instant snippets with automatic dependency resolution via JBang.
+ * High-risk Java script execution tool. Arbitrary scripts require an approved isolated execution environment.
  * Includes automatic self-bootstrapping/download if not installed on the host.
  *
  * <p>Execution is routed through {@link CifrHarnessBridge} for capability checking,
@@ -50,68 +50,15 @@ public class JBangTool implements CifrTool {
                         )
                 ),
                 Set.of(ToolCapability.EXECUTE_PROCESS, ToolCapability.NETWORK_ACCESS),
-                ToolRisk.MEDIUM
+                ToolRisk.CRITICAL
         );
     }
 
     @Override
     public Uni<ToolResult> execute(ToolRequest request, ToolExecutionContext context) {
-        return Uni.createFrom().item(() -> {
-            Map<String, Object> args = request.arguments();
-            String action = argString(args, "action", "run");
-            int timeoutSec = argInt(args, "timeout", DEFAULT_TIMEOUT_SECONDS);
-
-            // Prefer workspaceRoot from context (avoids ThreadLocal fallback)
-            Path workingDir = WorkspaceResolver.resolveWorkspaceRoot(context);
-            if (args.containsKey("working_dir") && args.get("working_dir") instanceof String wdStr) {
-                workingDir = context.resolveWorkspacePath(wdStr);
-            }
-
-            try {
-                if ("install".equalsIgnoreCase(action)) {
-                    Path installed = JBangBootstrap.ensureInstalled();
-                    return JBangResult.ok(
-                            "JBang successfully verified/installed at: " + installed.toAbsolutePath(),
-                            "", "", 0
-                    );
-                }
-
-                Path jbangPath = JBangBootstrap.ensureInstalled();
-                JBangImpl runner = new JBangImpl(jbangPath);
-
-                if ("info".equalsIgnoreCase(action)) {
-                    JBangImpl.Result res = runner.executeSubcommand(List.of("version"), timeoutSec, workingDir);
-                    return res.success()
-                            ? JBangResult.ok(res.stdout(), res.stdout(), res.stderr(), res.exitCode())
-                            : JBangResult.err(res.stderr(), res.stdout(), res.stderr(), res.exitCode());
-                }
-
-                String code = argString(args, "code", null);
-                String scriptPath = argString(args, "script_path", null);
-                List<String> deps = argStringList(args, "dependencies");
-                List<String> scriptArgs = argStringList(args, "args");
-                List<String> jbangFlags = argStringList(args, "jbang_args");
-
-                JBangImpl.Result result;
-                if (code != null && !code.isBlank()) {
-                    result = runner.runSnippet(code, deps, scriptArgs, jbangFlags, timeoutSec, workingDir);
-                } else if (scriptPath != null && !scriptPath.isBlank()) {
-                    if (!scriptPath.matches("^[a-zA-Z][a-zA-Z0-9+.-]*://.*")) {
-                        scriptPath = context.resolveWorkspacePath(scriptPath).toString();
-                    }
-                    result = runner.runScript(scriptPath, scriptArgs, jbangFlags, timeoutSec, workingDir);
-                } else {
-                    return JBangResult.err("Either 'code' or 'script_path' must be provided for 'run' action.", "", "", -1);
-                }
-
-                return result.success()
-                        ? JBangResult.ok(result.combinedOutput(), result.stdout(), result.stderr(), result.exitCode())
-                        : JBangResult.err(result.combinedOutput(), result.stdout(), result.stderr(), result.exitCode());
-
-            } catch (Exception ex) {
-                return JBangResult.err("JBang tool execution error: " + ex.getMessage(), "", ex.getMessage(), -1);
-            }
-        });
+        return Uni.createFrom().item(() -> JBangResult.err(
+                "JBang is disabled: arbitrary scripts require per-invocation approval and an OS-isolated execution backend",
+                "", "", -1));
     }
 
     private static String argString(Map<String, Object> args, String key, String defaultValue) {
