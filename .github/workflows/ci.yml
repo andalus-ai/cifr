@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   maven:
-    name: Maven validation (JDK 25)
+    name: Full Maven reactor (JDK 25)
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -29,8 +29,5 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Validate complete reactor model
-        run: mvn --batch-mode --no-transfer-progress -Pci validate
-
-      - name: Verify standalone IDE client module
-        run: mvn --batch-mode --no-transfer-progress -Pci -pl cifr-ide-client -am verify
+      - name: Build and test the complete reactor
+        run: mvn --batch-mode --no-transfer-progress -Pci verify
