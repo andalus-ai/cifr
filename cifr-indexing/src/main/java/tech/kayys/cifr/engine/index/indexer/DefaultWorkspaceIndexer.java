@@ -213,7 +213,7 @@ public class DefaultWorkspaceIndexer implements WorkspaceIndexer {
             // Extract symbols if source code
             if ("java".equals(lang) || "dart".equals(lang) || "typescript".equals(lang) || "python".equals(lang)) {
                 extractSymbols(relative, content, workspaceId, symbolsCount);
-                extractDependencies(relative, content, depsCount);
+                extractDependencies(relative, content, depsCount, workspaceId);
             }
 
         } catch (IOException e) {
