@@ -5,10 +5,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import tech.kayys.cifr.engine.policy.Decision;
 import tech.kayys.cifr.engine.policy.PolicyContext;
 
-import java.util.UUID;
-
 /**
- * Default implementation of {@link AuthorizationService}.
+ * Fail-closed authorization fallback.
+ *
+ * A proposal is not authorization evidence. Until an explicit policy evaluator is
+ * wired into the runtime, this implementation denies both initial authorization
+ * and reauthorization rather than silently granting actions.
  */
 @ApplicationScoped
 public class DefaultAuthorizationService implements AuthorizationService {
@@ -19,9 +21,10 @@ public class DefaultAuthorizationService implements AuthorizationService {
             if (proposal == null) {
                 return AuthorizationResult.denied(Decision.deny("NULL_PROPOSAL", "Proposal is null"));
             }
-            String actionId = "act-" + UUID.randomUUID();
-            AuthorizedAction authorized = AuthorizedAction.of(actionId, proposal);
-            return AuthorizationResult.granted(authorized, Decision.allow("Authorized by default policy"));
+            return AuthorizationResult.denied(Decision.deny(
+                "NO_POLICY_EVALUATOR",
+                "No authorization policy evaluator is configured"
+            ));
         });
     }
 
@@ -29,9 +32,12 @@ public class DefaultAuthorizationService implements AuthorizationService {
     public Uni<AuthorizationResult> reauthorize(AuthorizedAction action, PolicyContext context) {
         return Uni.createFrom().item(() -> {
             if (action == null || action.isExpired()) {
-                return AuthorizationResult.denied(Decision.deny("EXPIRED", "Authorization has expired"));
+                return AuthorizationResult.denied(Decision.deny("EXPIRED", "Authorization is missing or has expired"));
             }
-            return AuthorizationResult.granted(action, Decision.allow("Reauthorized"));
+            return AuthorizationResult.denied(Decision.deny(
+                "NO_POLICY_EVALUATOR",
+                "Authorization cannot be renewed without policy evaluation"
+            ));
         });
     }
 }
