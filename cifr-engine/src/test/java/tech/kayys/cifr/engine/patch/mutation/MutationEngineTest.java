@@ -19,7 +19,9 @@ public class MutationEngineTest {
     @BeforeEach
     void setUp() throws IOException {
         tempWorkspace = Files.createTempDirectory("mutation-test-");
-        mutationEngine = new DefaultMutationEngine();
+        DefaultMutationEngine engine = new DefaultMutationEngine();
+        engine.mutationGate = new DefaultMutationGate();
+        mutationEngine = engine;
     }
 
     @AfterEach
@@ -37,7 +39,7 @@ public class MutationEngineTest {
 
     @Test
     void testApplyModificationAndRollback() throws IOException {
-        Path file = tempWorkspace.resolve("Sample.java");
+        Path file = tempWorkspace.resolve("src/Sample.java");
         Files.writeString(file, "public class Sample {\n    int value = 10;\n}");
 
         TextEdit edit = new TextEdit("int value = 10;", "int value = 42;");
@@ -57,7 +59,8 @@ public class MutationEngineTest {
 
     @Test
     void rollbackCannotBeAppliedToAnotherWorkspace() throws IOException {
-        Path file = tempWorkspace.resolve("Scoped.java");
+        Path file = tempWorkspace.resolve("src/Scoped.java");
+        Files.createDirectories(file.getParent());
         Files.writeString(file, "class Scoped {}");
 
         EditProposal proposal = new EditProposal(
@@ -103,7 +106,7 @@ public class MutationEngineTest {
 
     @Test
     void testCreateNewFileAndRollback() throws IOException {
-        Path newFile = tempWorkspace.resolve("NewService.java");
+        Path newFile = tempWorkspace.resolve("src/NewService.java");
         assertFalse(Files.exists(newFile));
 
         TextEdit edit = new TextEdit("", "public class NewService {}");
