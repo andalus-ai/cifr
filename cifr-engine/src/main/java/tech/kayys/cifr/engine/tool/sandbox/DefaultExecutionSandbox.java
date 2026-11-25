@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -30,6 +29,7 @@ public class DefaultExecutionSandbox implements ExecutionSandbox {
 
     private static final int MAX_CAPTURE_BYTES_PER_STREAM = 1024 * 1024;
     private static final long DEFAULT_TIMEOUT_MILLIS = 30_000L;
+    private static final long TERMINATION_GRACE_MILLIS = 250L;
 
     @Override
     public Uni<ExecutionResult> execute(List<String> command, SandboxPolicy policy) {
@@ -63,28 +63,25 @@ public class DefaultExecutionSandbox implements ExecutionSandbox {
             long timeoutMillis = timeoutMillis(policy);
             boolean completed = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);
             if (!completed) {
-                process.destroy();
-                if (!process.waitFor(250, TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly();
-                    process.waitFor();
-                }
+                terminateProcessTree(process);
             }
 
             String stdout = getCaptured(stdoutFuture);
             String stderr = getCaptured(stderrFuture);
             if (!completed) {
-                return new ExecutionResult(-1, stdout, append(stderr, "Process timed out after " + timeoutMillis + " ms"), true);
+                return new ExecutionResult(-1, stdout,
+                        append(stderr, "Process timed out after " + timeoutMillis + " ms"), true);
             }
             return new ExecutionResult(process.exitValue(), stdout, stderr, false);
         } catch (InterruptedException e) {
             if (process != null) {
-                process.destroyForcibly();
+                forceTerminateProcessTree(process);
             }
             Thread.currentThread().interrupt();
             return new ExecutionResult(-1, "", "Process execution interrupted", false);
         } catch (Exception e) {
             if (process != null && process.isAlive()) {
-                process.destroyForcibly();
+                forceTerminateProcessTree(process);
             }
             String message = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             return new ExecutionResult(-1, "", message, false);
@@ -96,6 +93,31 @@ public class DefaultExecutionSandbox implements ExecutionSandbox {
                 try { process.getOutputStream().close(); } catch (IOException ignored) {}
             }
         }
+    }
+
+    /**
+     * Stops descendants before their parent so a timed-out command cannot leave
+     * background children running after the root process has exited.
+     */
+    private static void terminateProcessTree(Process process) throws InterruptedException {
+        List<ProcessHandle> descendants = process.toHandle().descendants().toList();
+        descendants.forEach(ProcessHandle::destroy);
+        process.destroy();
+
+        if (!process.waitFor(TERMINATION_GRACE_MILLIS, TimeUnit.MILLISECONDS)) {
+            forceTerminateProcessTree(process);
+            process.waitFor();
+        }
+        // Refresh the snapshot because a child may have forked during the grace period.
+        process.toHandle().descendants().forEach(ProcessHandle::destroyForcibly);
+        descendants.forEach(handle -> {
+            if (handle.isAlive()) handle.destroyForcibly();
+        });
+    }
+
+    private static void forceTerminateProcessTree(Process process) {
+        process.toHandle().descendants().forEach(ProcessHandle::destroyForcibly);
+        process.destroyForcibly();
     }
 
     private static void validate(List<String> command, SandboxPolicy policy) {
@@ -148,7 +170,8 @@ public class DefaultExecutionSandbox implements ExecutionSandbox {
             if (keep < read) truncated = true;
         }
         String output = captured.toString(StandardCharsets.UTF_8);
-        return truncated ? append(output, "[output truncated after " + MAX_CAPTURE_BYTES_PER_STREAM + " bytes]") : output;
+        return truncated ? append(output,
+                "[output truncated after " + MAX_CAPTURE_BYTES_PER_STREAM + " bytes]") : output;
     }
 
     private static String getCaptured(CompletableFuture<String> future)
