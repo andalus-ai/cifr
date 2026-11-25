@@ -17,11 +17,11 @@ import java.util.List;
  * Risk is conservatively derived from the concrete edit, never accepted from
  * the caller. Unknown or broad changes require explicit approval.
  */
-final class MutationGateSupport {
+public final class MutationGateSupport {
 
     private MutationGateSupport() {}
 
-    static Uni<MutationAuthorization> authorize(MutationGate gate, EditProposal proposal) {
+    public static Uni<MutationAuthorization> authorize(MutationGate gate, EditProposal proposal) {
         if (gate == null) {
             return Uni.createFrom().item(() ->
                     MutationAuthorization.deny("Mutation gate is not configured"));
