@@ -95,7 +95,7 @@ public class MutationEngineTest {
         Files.writeString(file, "public class Sample {\n    int value = 99;\n}");
 
         TextEdit edit = new TextEdit("int value = 10;", "int value = 42;");
-        FileEdit fileEdit = new FileEdit(Path.of("Sample.java"), List.of(edit));
+        FileEdit fileEdit = new FileEdit(Path.of("src/Sample.java"), List.of(edit));
         EditProposal proposal = new EditProposal("Update stale value", List.of(fileEdit), List.of(), List.of());
 
         Exception ex = assertThrows(IllegalStateException.class, () -> {
