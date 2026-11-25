@@ -31,7 +31,7 @@ class DefaultExecutionSandboxTest {
                 128L * 1024 * 1024);
 
         ExecutionResult result = new DefaultExecutionSandbox().execute(
-                List.of(shell.toString(), "-c", "sleep 30 & echo $!; wait"),
+                List.of(shell.toString(), "-c", "trap 'wait' TERM; sleep 30 & echo $!; wait"),
                 policy).await().indefinitely();
 
         assertTrue(result.timedOut(), "The command should hit its configured timeout");
