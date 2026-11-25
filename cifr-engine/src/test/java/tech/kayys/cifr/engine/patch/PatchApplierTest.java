@@ -54,7 +54,7 @@ public class PatchApplierTest {
         applier.gitService = null;
 
         PatchEdit edit = new PatchEdit("expiresAt > now\n", "expiresAt >= now\n");
-        PatchOperation patch = new PatchOperation("patch-test-1", "test-temp/test.txt",
+        PatchOperation patch = new PatchOperation("patch-test-1", "src/test-temp/test.txt",
                 List.of(edit), "test", null, null);
 
         AppliedPatch result = applier.apply(patch, context());
