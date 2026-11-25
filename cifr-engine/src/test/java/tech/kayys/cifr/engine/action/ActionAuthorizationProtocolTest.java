@@ -26,7 +26,7 @@ public class ActionAuthorizationProtocolTest {
     }
 
     @Test
-    public void testAuthorizeProposal() {
+    public void testAuthorizeProposalFailsClosedWithoutPolicy() {
         ActionProposal proposal = new ActionProposal(
             "prop-1",
             TaskId.of("t-auth-1"),
@@ -40,19 +40,15 @@ public class ActionAuthorizationProtocolTest {
 
         AuthorizationResult result = authService.authorize(proposal, context).await().indefinitely();
 
-        assertTrue(result.isAuthorized());
-        assertTrue(result.action().isPresent());
-
-        AuthorizedAction action = result.action().get();
-        assertEquals("prop-1", action.proposal().id());
-        assertFalse(action.isExpired());
+        assertFalse(result.isAuthorized());
+        assertTrue(result.action().isEmpty());
+        assertEquals("NO_POLICY_EVALUATOR", result.decision().ruleId().orElseThrow());
     }
 
     @Test
     public void testExpiredActionReauthorizationFails() {
         ActionProposal proposal = ActionProposal.of("prop-2", TaskId.of("t-auth-1"), ActionType.READ, ActionTarget.file("README.md"), "Read doc");
 
-        // Create an already expired action
         AuthorizedAction expiredAction = new AuthorizedAction(
             "act-expired",
             proposal,
@@ -65,5 +61,22 @@ public class ActionAuthorizationProtocolTest {
         AuthorizationResult reauthResult = authService.reauthorize(expiredAction, context).await().indefinitely();
         assertFalse(reauthResult.isAuthorized());
         assertEquals("DENY", reauthResult.decision().reason().code());
+    }
+
+    @Test
+    public void testValidActionCannotBeReauthorizedWithoutPolicy() {
+        ActionProposal proposal = ActionProposal.of("prop-3", TaskId.of("t-auth-1"), ActionType.READ, ActionTarget.file("README.md"), "Read doc");
+        AuthorizedAction validAction = new AuthorizedAction(
+            "act-valid",
+            proposal,
+            Instant.now().minusSeconds(30),
+            Instant.now().plusSeconds(300)
+        );
+
+        AuthorizationResult result = authService.reauthorize(validAction, context).await().indefinitely();
+
+        assertFalse(result.isAuthorized());
+        assertTrue(result.action().isEmpty());
+        assertEquals("NO_POLICY_EVALUATOR", result.decision().ruleId().orElseThrow());
     }
 }
