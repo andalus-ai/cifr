@@ -19,7 +19,9 @@ public class MutationEngineTest {
     @BeforeEach
     void setUp() throws IOException {
         tempWorkspace = Files.createTempDirectory("mutation-test-");
-        mutationEngine = new DefaultMutationEngine();
+        DefaultMutationEngine engine = new DefaultMutationEngine();
+        engine.mutationGate = new DefaultMutationGate();
+        mutationEngine = engine;
     }
 
     @AfterEach
@@ -37,11 +39,12 @@ public class MutationEngineTest {
 
     @Test
     void testApplyModificationAndRollback() throws IOException {
-        Path file = tempWorkspace.resolve("Sample.java");
+        Path file = tempWorkspace.resolve("src/Sample.java");
+        Files.createDirectories(file.getParent());
         Files.writeString(file, "public class Sample {\n    int value = 10;\n}");
 
         TextEdit edit = new TextEdit("int value = 10;", "int value = 42;");
-        FileEdit fileEdit = new FileEdit(Path.of("Sample.java"), List.of(edit));
+        FileEdit fileEdit = new FileEdit(Path.of("src/Sample.java"), List.of(edit));
         EditProposal proposal = new EditProposal("Update value", List.of(fileEdit), List.of(), List.of());
 
         MutationResult result = mutationEngine.apply(proposal, tempWorkspace).await().indefinitely();
@@ -57,12 +60,13 @@ public class MutationEngineTest {
 
     @Test
     void rollbackCannotBeAppliedToAnotherWorkspace() throws IOException {
-        Path file = tempWorkspace.resolve("Scoped.java");
+        Path file = tempWorkspace.resolve("src/Scoped.java");
+        Files.createDirectories(file.getParent());
         Files.writeString(file, "class Scoped {}");
 
         EditProposal proposal = new EditProposal(
                 "change scoped file",
-                List.of(new FileEdit(Path.of("Scoped.java"),
+                List.of(new FileEdit(Path.of("src/Scoped.java"),
                         List.of(new TextEdit("Scoped", "Changed")))),
                 List.of(),
                 List.of());
@@ -86,11 +90,12 @@ public class MutationEngineTest {
 
     @Test
     void testStaleEditDetection() throws IOException {
-        Path file = tempWorkspace.resolve("Sample.java");
+        Path file = tempWorkspace.resolve("src/Sample.java");
+        Files.createDirectories(file.getParent());
         Files.writeString(file, "public class Sample {\n    int value = 99;\n}");
 
         TextEdit edit = new TextEdit("int value = 10;", "int value = 42;");
-        FileEdit fileEdit = new FileEdit(Path.of("Sample.java"), List.of(edit));
+        FileEdit fileEdit = new FileEdit(Path.of("src/Sample.java"), List.of(edit));
         EditProposal proposal = new EditProposal("Update stale value", List.of(fileEdit), List.of(), List.of());
 
         Exception ex = assertThrows(IllegalStateException.class, () -> {
@@ -103,11 +108,11 @@ public class MutationEngineTest {
 
     @Test
     void testCreateNewFileAndRollback() throws IOException {
-        Path newFile = tempWorkspace.resolve("NewService.java");
+        Path newFile = tempWorkspace.resolve("src/NewService.java");
         assertFalse(Files.exists(newFile));
 
         TextEdit edit = new TextEdit("", "public class NewService {}");
-        FileEdit fileEdit = new FileEdit(Path.of("NewService.java"), List.of(edit));
+        FileEdit fileEdit = new FileEdit(Path.of("src/NewService.java"), List.of(edit));
         EditProposal proposal = new EditProposal("Create new file", List.of(fileEdit), List.of(), List.of());
 
         MutationResult result = mutationEngine.apply(proposal, tempWorkspace).await().indefinitely();

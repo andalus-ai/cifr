@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tech.kayys.cifr.engine.tool.ToolExecutionContext;
+import tech.kayys.cifr.engine.patch.mutation.DefaultMutationGate;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,7 +19,7 @@ public class PatchApplierTest {
     @TempDir
     Path workspaceRoot;
 
-    private Path testDir() { return workspaceRoot.resolve("test-temp"); }
+    private Path testDir() { return workspaceRoot.resolve("src/test-temp"); }
     private Path testFile() { return testDir().resolve("test.txt"); }
 
     private ToolExecutionContext context() {
@@ -47,12 +48,13 @@ public class PatchApplierTest {
 
         PatchApplier applier = new PatchApplier();
         applier.validator = validator;
+        applier.mutationGate = new DefaultMutationGate();
         applier.mutationStore = store;
         applier.workspaceGuard = guard;
         applier.gitService = null;
 
         PatchEdit edit = new PatchEdit("expiresAt > now\n", "expiresAt >= now\n");
-        PatchOperation patch = new PatchOperation("patch-test-1", "test-temp/test.txt",
+        PatchOperation patch = new PatchOperation("patch-test-1", "src/test-temp/test.txt",
                 List.of(edit), "test", null, null);
 
         AppliedPatch result = applier.apply(patch, context());

@@ -31,8 +31,8 @@ public class PatchValidator {
             for (int i = 0; i < patch.edits().size(); i++) {
                 PatchEdit edit = patch.edits().get(i);
                 int matches = countOccurrences(currentContent, edit.expectedText());
-                if (matches < 1) {
-                    errors.add("Edit index " + i + " failed: Expected at least 1 match for expectedText, found " + matches);
+                if (matches != 1) {
+                    errors.add("Edit index " + i + " failed: Expected exactly 1 match for expectedText, found " + matches);
                 }
             }
         } catch (IOException e) {

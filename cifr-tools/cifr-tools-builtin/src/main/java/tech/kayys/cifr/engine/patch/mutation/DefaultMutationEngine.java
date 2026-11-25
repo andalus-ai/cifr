@@ -2,6 +2,7 @@ package tech.kayys.cifr.engine.patch.mutation;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import tech.kayys.cifr.engine.index.WorkspaceFingerprint;
 import tech.kayys.cifr.engine.repo.ChangeRecord;
@@ -20,12 +21,20 @@ public class DefaultMutationEngine implements MutationEngine {
 
     private static final Logger LOG = Logger.getLogger(DefaultMutationEngine.class);
 
+    @Inject
+    MutationGate mutationGate;
+
     private record RollbackEntry(Path workspaceRoot, Map<Path, String> backups) {}
     private final Map<String, RollbackEntry> rollbackJournal = new ConcurrentHashMap<>();
 
     @Override
     public Uni<MutationResult> apply(EditProposal proposal, Path workspaceRoot) {
-        return Uni.createFrom().item(() -> {
+        return MutationGateSupport.authorize(mutationGate, proposal).flatMap(authorization -> {
+            if (authorization.status() != MutationAuthorization.Status.ALLOW) {
+                return Uni.createFrom().failure(new SecurityException(
+                        authorization.reason().orElse("Mutation was not authorized")));
+            }
+            return Uni.createFrom().item(() -> {
             if (proposal == null || proposal.edits().isEmpty()) {
                 throw new IllegalArgumentException("Proposal has no file edits to apply");
             }
@@ -53,12 +62,13 @@ public class DefaultMutationEngine implements MutationEngine {
                 String updatedContent = currentContent;
                 for (TextEdit edit : fileEdit.edits()) {
                     if (edit.expectedText() != null && !edit.expectedText().isEmpty()) {
-                        if (!updatedContent.contains(edit.expectedText())) {
+                        int matches = occurrences(updatedContent, edit.expectedText());
+                        if (matches != 1) {
                             throw new IllegalStateException(String.format(
                                     "Stale edit rejected: expected content not found in '%s'. Expected: [%s]",
                                     relativePath, edit.expectedText().trim()));
                         }
-                        updatedContent = updatedContent.replace(edit.expectedText(), edit.replacementText());
+                        updatedContent = replaceFirst(updatedContent, edit.expectedText(), edit.replacementText());
                     } else if (!fileExists || updatedContent.isEmpty()) {
                         updatedContent = edit.replacementText();
                     }
@@ -99,6 +109,7 @@ public class DefaultMutationEngine implements MutationEngine {
             WorkspaceFingerprint fingerprint = new WorkspaceFingerprint(
                     "repo-hash-" + mutationId.value(), "1.0", "cfg-hash-" + mutationId.value());
             return new MutationResult(mutationId, new ChangeSet(records), evidence, fingerprint);
+            });
         });
     }
 
@@ -126,6 +137,23 @@ public class DefaultMutationEngine implements MutationEngine {
             rollbackJournal.remove(mutationId.value(), rollback);
             return null;
         });
+    }
+
+
+    private int occurrences(String source, String target) {
+        int count = 0;
+        int offset = 0;
+        while ((offset = source.indexOf(target, offset)) >= 0) {
+            count++;
+            offset += target.length();
+        }
+        return count;
+    }
+
+    private String replaceFirst(String source, String target, String replacement) {
+        int index = source.indexOf(target);
+        if (index < 0) return source;
+        return source.substring(0, index) + replacement + source.substring(index + target.length());
     }
 
     private Path requireWorkspaceRoot(Path workspaceRoot) {

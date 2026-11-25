@@ -7,6 +7,12 @@ import tech.kayys.cifr.engine.repo.ChangeType;
 import tech.kayys.cifr.engine.repo.GitRepositoryService;
 import tech.kayys.cifr.engine.repo.RepositorySnapshot;
 import tech.kayys.cifr.engine.tool.ToolExecutionContext;
+import tech.kayys.cifr.engine.patch.mutation.EditProposal;
+import tech.kayys.cifr.engine.patch.mutation.FileEdit;
+import tech.kayys.cifr.engine.patch.mutation.MutationAuthorization;
+import tech.kayys.cifr.engine.patch.mutation.MutationGate;
+import tech.kayys.cifr.engine.patch.mutation.MutationGateSupport;
+import tech.kayys.cifr.engine.patch.mutation.TextEdit;
 import tech.kayys.andalus.extension.Id;
 
 import java.io.IOException;
@@ -26,6 +32,9 @@ public class PatchApplier {
     PatchValidator validator;
 
     @jakarta.inject.Inject
+    MutationGate mutationGate;
+
+    @jakarta.inject.Inject
     GitRepositoryService gitService;
 
     @jakarta.inject.Inject
@@ -39,6 +48,19 @@ public class PatchApplier {
         if (mutationStore != null && mutationStore.isApplied(patch.id(), context)) {
             RepositorySnapshot snapshot = gitService != null ? gitService.captureSnapshot(workspaceRoot) : null;
             return new AppliedPatch(patch.id(), new ChangeSet(new ArrayList<>()), snapshot);
+        }
+
+        EditProposal mutationProposal = new EditProposal(
+                patch.reason(),
+                List.of(new FileEdit(Path.of(patch.path()), patch.edits().stream()
+                        .map(edit -> new TextEdit(edit.expectedText(), edit.replacementText()))
+                        .toList())),
+                List.of(),
+                List.of(patch.id()));
+        MutationAuthorization authorization = MutationGateSupport
+                .authorize(mutationGate, mutationProposal).await().indefinitely();
+        if (authorization.status() != MutationAuthorization.Status.ALLOW) {
+            throw new SecurityException(authorization.reason().orElse("Patch mutation was not authorized"));
         }
 
         if (validator != null) {
@@ -70,7 +92,7 @@ public class PatchApplier {
             String beforeHash = computeSha256(currentContent);
             String newContent = currentContent;
             for (PatchEdit edit : patch.edits()) {
-                newContent = newContent.replace(edit.expectedText(), edit.replacementText());
+                newContent = replaceFirst(newContent, edit.expectedText(), edit.replacementText());
             }
             Files.writeString(target, newContent);
             String afterHash = computeSha256(newContent);
@@ -88,6 +110,13 @@ public class PatchApplier {
 
         RepositorySnapshot newSnapshot = gitService != null ? gitService.captureSnapshot(workspaceRoot) : null;
         return new AppliedPatch(patch.id(), new ChangeSet(records), newSnapshot);
+    }
+
+
+    private String replaceFirst(String source, String expected, String replacement) {
+        int index = source.indexOf(expected);
+        if (index < 0) throw new IllegalStateException("Patch edit no longer matches target content");
+        return source.substring(0, index) + replacement + source.substring(index + expected.length());
     }
 
     private String computeSha256(String content) {
