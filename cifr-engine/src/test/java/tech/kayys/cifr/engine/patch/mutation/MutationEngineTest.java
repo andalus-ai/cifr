@@ -40,10 +40,11 @@ public class MutationEngineTest {
     @Test
     void testApplyModificationAndRollback() throws IOException {
         Path file = tempWorkspace.resolve("src/Sample.java");
+        Files.createDirectories(file.getParent());
         Files.writeString(file, "public class Sample {\n    int value = 10;\n}");
 
         TextEdit edit = new TextEdit("int value = 10;", "int value = 42;");
-        FileEdit fileEdit = new FileEdit(Path.of("Sample.java"), List.of(edit));
+        FileEdit fileEdit = new FileEdit(Path.of("src/Sample.java"), List.of(edit));
         EditProposal proposal = new EditProposal("Update value", List.of(fileEdit), List.of(), List.of());
 
         MutationResult result = mutationEngine.apply(proposal, tempWorkspace).await().indefinitely();
@@ -65,7 +66,7 @@ public class MutationEngineTest {
 
         EditProposal proposal = new EditProposal(
                 "change scoped file",
-                List.of(new FileEdit(Path.of("Scoped.java"),
+                List.of(new FileEdit(Path.of("src/Scoped.java"),
                         List.of(new TextEdit("Scoped", "Changed")))),
                 List.of(),
                 List.of());
@@ -89,7 +90,8 @@ public class MutationEngineTest {
 
     @Test
     void testStaleEditDetection() throws IOException {
-        Path file = tempWorkspace.resolve("Sample.java");
+        Path file = tempWorkspace.resolve("src/Sample.java");
+        Files.createDirectories(file.getParent());
         Files.writeString(file, "public class Sample {\n    int value = 99;\n}");
 
         TextEdit edit = new TextEdit("int value = 10;", "int value = 42;");
@@ -110,7 +112,7 @@ public class MutationEngineTest {
         assertFalse(Files.exists(newFile));
 
         TextEdit edit = new TextEdit("", "public class NewService {}");
-        FileEdit fileEdit = new FileEdit(Path.of("NewService.java"), List.of(edit));
+        FileEdit fileEdit = new FileEdit(Path.of("src/NewService.java"), List.of(edit));
         EditProposal proposal = new EditProposal("Create new file", List.of(fileEdit), List.of(), List.of());
 
         MutationResult result = mutationEngine.apply(proposal, tempWorkspace).await().indefinitely();
