@@ -49,4 +49,19 @@ public class PatchValidatorTest {
         PatchValidationResult result = new PatchValidator().validate(patch, context());
         assertFalse(result.isValid(), "Patch should be invalid when expectedText missing");
     }
+    @Test
+    public void testValidateRejectsAmbiguousExpectedText() throws IOException {
+        Path testDir = Files.createDirectory(workspaceRoot.resolve("src"));
+        Path testFile = testDir.resolve("Duplicate.java");
+        Files.writeString(testFile, "value = 1;\\nvalue = 1;\\n");
+
+        PatchEdit edit = new PatchEdit("value = 1;", "value = 2;");
+        PatchOperation patch = new PatchOperation("pv-3", "src/Duplicate.java",
+                List.of(edit), "ambiguous patch", null, null);
+
+        PatchValidationResult result = new PatchValidator().validate(patch, context());
+        assertFalse(result.isValid(), "Ambiguous expected text must not be accepted");
+        assertTrue(result.errors().stream().anyMatch(error -> error.contains("exactly 1 match")));
+    }
+
 }
