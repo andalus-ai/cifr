@@ -80,7 +80,7 @@ public class DefaultExecutionSandbox implements ExecutionSandbox {
             Thread.currentThread().interrupt();
             return new ExecutionResult(-1, "", "Process execution interrupted", false);
         } catch (Exception e) {
-            if (process != null && process.isAlive()) {
+            if (process != null) {
                 forceTerminateProcessTree(process);
             }
             String message = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
